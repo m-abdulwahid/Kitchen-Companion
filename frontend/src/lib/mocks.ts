@@ -1,22 +1,8 @@
 import { ASSISTANT } from "./assistant";
-import type { Recipe, VisionCheckResult } from "./types";
+import type { Recipe } from "./types";
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// TODO: replace with a real vision-model step-check (frame + current step → pass/fail + coaching).
-export async function checkStepWithVision(
-  _imageDataUrl: string,
-  stepText: string,
-  stepIndex: number,
-  assistantName: string = ASSISTANT.name,
-): Promise<VisionCheckResult> {
-  await wait(1200);
-  return {
-    passed: true,
-    feedback: `${assistantName} peeked at the camera — step ${stepIndex + 1} looks on track. ${stepText.slice(0, 48)}… keep going, chef.`,
-  };
 }
 
 // TODO: replace with a real LLM question-answering call (question + recipe + step → spoken answer).

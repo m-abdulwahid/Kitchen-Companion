@@ -39,6 +39,8 @@ Kitchen-Companion/
 
 With the voice service running, browse Remy's voices at http://localhost:8000/voices.
 
+How much Omni have we used? Open http://localhost:8000/usage (password protected) or run `python scripts/usage_report.py`; see [docs/usage-reporting.md](docs/usage-reporting.md). The submission is due 2026-09-20, 11:59 PM Eastern.
+
 "Ask Remy" needs the voice service running on port 8000; how it all connects: [docs/voice-integration.md](docs/voice-integration.md).
 
 ## Merging without breaking things

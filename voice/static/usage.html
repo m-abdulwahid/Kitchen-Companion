@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Omni usage</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #fff6ec; --card: #ffffff; --ink: #3d2418; --muted: #8a6a58; --line: #f0dccb;
+    --accent: #e85d4c; --accent-ink: #ffffff; --ok: #2f8a4f; --bad: #b3261e; --chip: #fde8d8; --bar: #f6b8a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1410; --card: #2a1d17; --ink: #f6e6d8; --muted: #b99a86; --line: #3f2c22;
+            --accent: #f0705f; --accent-ink: #1d1410; --ok: #6fcf8f; --bad: #ff8a80; --chip: #3f2c22; --bar: #7a3f34; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0; font-size: 1.8rem; }
+  h2 { margin: 0 0 12px; font-size: 1.15rem; }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+  .head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: .78rem; padding: 2px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .chip.ok { color: var(--ok); } .chip.bad { color: var(--bad); }
+  button { font: inherit; cursor: pointer; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 6px 14px; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button[disabled] { opacity: .6; cursor: progress; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  input[type=password], input[type=number], input[type=text] { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  textarea { width: 100%; min-height: 300px; font: .85rem/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .gate { max-width: 380px; margin: 12vh auto 0; text-align: center; }
+  .gate form { display: flex; gap: 8px; margin-top: 16px; }
+  .gate input { flex: 1; }
+  .err { color: var(--bad); min-height: 1.4em; margin: 10px 0 0; }
+  .banner { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; }
+  .banner strong { font-size: 1.3rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .card .value { font-size: 1.9rem; font-weight: 700; line-height: 1.2; }
+  .card .sub { font-size: .85rem; color: var(--muted); }
+  .progress { height: 12px; background: var(--chip); border-radius: 999px; overflow: hidden; margin-top: 10px; }
+  .progress > div { height: 100%; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  #recent th:nth-child(2), #recent td:nth-child(2), #recent th:nth-child(3), #recent td:nth-child(3),
+  #recent th:nth-child(4), #recent td:nth-child(4) { text-align: left; }
+  .barcell { position: relative; }
+  .barcell .bar { position: absolute; left: 0; top: 3px; bottom: 3px; background: var(--bar); border-radius: 6px; opacity: .55; }
+  .barcell span { position: relative; padding-left: 6px; }
+  .scroll { overflow-x: auto; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  ul.plain { list-style: none; padding: 0; margin: 0; }
+  ul.plain li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+  ul.plain li:last-child { border-bottom: 0; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 10px 0; }
+  .files li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; justify-content: space-between; }
+  label.inline { display: inline-flex; gap: 6px; align-items: center; }
+  ol.steps { margin: 0 0 8px; padding-left: 20px; }
+  ol.steps li { padding: 2px 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <!-- Locked: shows nothing but the password box -->
+  <section class="panel gate" id="gate">
+    <h1>Omni usage</h1>
+    <p class="muted">Enter the password to see the API usage.</p>
+    <form id="loginForm">
+      <input type="password" id="password" placeholder="Password" aria-label="Password" autocomplete="current-password" required>
+      <button class="primary" type="submit" id="unlock">Unlock</button>
+    </form>
+    <p class="err" id="gateError" role="alert"></p>
+  </section>
+
+  <!-- Unlocked -->
+  <div id="app" hidden>
+    <div class="head">
+      <div>
+        <h1>Omni usage</h1>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div class="row" style="margin:0">
+        <span class="muted" id="updated"></span>
+        <button type="button" id="refresh">Refresh</button>
+        <button type="button" id="lock">Lock</button>
+      </div>
+    </div>
+
+    <section class="panel banner" aria-label="Deadline">
+      <span class="muted">Report due</span>
+      <strong id="countdown"></strong>
+      <span class="muted" id="deadlineText"></span>
+    </section>
+
+    <div class="cards" id="cards"></div>
+
+    <section class="panel" aria-label="Allocation">
+      <h2>How much is left?</h2>
+      <p class="muted" style="margin-top:0">The organisers' tools do not say how much you have. If your approval email gives an allocation in tokens, enter it and this page shows how much is used. It is saved in this browser only.</p>
+      <div class="row">
+        <label for="allocation">My allocation (tokens)</label>
+        <input type="number" id="allocation" min="0" step="1000" placeholder="e.g. 1000000">
+        <span id="allocationText" class="muted"></span>
+      </div>
+      <div class="progress" id="progressWrap" hidden><div id="progressBar"></div></div>
+    </section>
+
+    <div class="two">
+      <section class="panel"><h2>By purpose</h2><div class="scroll" id="byPurpose"></div></section>
+      <section class="panel"><h2>By model</h2><div class="scroll" id="byModel"></div>
+        <h2 style="margin-top:16px">By day</h2><div class="scroll" id="byDay"></div></section>
+    </div>
+
+    <section class="panel"><h2>Latest calls</h2><div class="scroll" id="recent"></div></section>
+
+    <section class="panel" aria-label="Submit">
+      <h2>Send to the organisers</h2>
+      <ol class="steps">
+        <li>Click <strong>Generate files</strong> (do this right before sending, so they include your latest calls).</li>
+        <li>Download the two files below.</li>
+        <li>Fill in the draft email, then reply to the email that delivered your API key and attach both files.</li>
+      </ol>
+      <div class="row">
+        <button type="button" class="primary" id="generate">Generate files</button>
+        <label class="inline"><input type="checkbox" id="redact"> remove my folder path from the summary</label>
+        <span id="generateMsg" role="status"></span>
+      </div>
+      <ul class="plain files" id="files"></ul>
+      <p class="muted" style="margin-bottom:0">Do not send the ledger itself, an <code>.env</code> file or your key. Do not post these files publicly.</p>
+    </section>
+
+    <div class="two">
+      <section class="panel"><h2>Before you send: checks</h2><ul class="plain" id="checks"></ul></section>
+      <section class="panel"><h2>Usage we know is missing</h2>
+        <ul class="plain" id="gaps"></ul>
+        <h2 style="margin-top:16px">Ledgers merged</h2><ul class="plain" id="sources"></ul></section>
+    </div>
+
+    <section class="panel">
+      <h2>Draft email</h2>
+      <p class="muted" style="margin-top:0">Fill in everything in [square brackets]. Edit freely; this text is not saved.</p>
+      <textarea id="draft" spellcheck="false"></textarea>
+      <div class="row"><button type="button" id="copyDraft">Copy email text</button><span id="copyMsg" role="status" class="muted"></span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Also useful</h2>
+      <ul class="plain">
+        <li><a href="/voices">Voice library</a>: hear and choose voices</li>
+        <li><a href="/docs">Voice service API docs</a></li>
+        <li>Full checklist: <code>docs/usage-reporting.md</code> in the repo. Command line: <code>python scripts/usage_report.py</code></li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  var KEY = "omniUsageToken", ALLOC = "omniUsageAllocation";
+  var token = null; try { token = sessionStorage.getItem(KEY); } catch (e) {}
+  var deadline = null, timer = null, data = null;
+  var fmt = function (n) { return Number(n || 0).toLocaleString(); };
+
+  function api(path, options) {
+    options = options || {};
+    options.headers = Object.assign({ "Content-Type": "application/json", "Authorization": "Bearer " + token }, options.headers || {});
+    return fetch(path, options).then(function (res) {
+      if (res.status === 401) { showGate("Your session ended. Enter the password again."); throw new Error("locked"); }
+      return res;
+    });
+  }
+
+  function showGate(message) {
+    token = null; try { sessionStorage.removeItem(KEY); } catch (e) {}
+    $("app").hidden = true; $("gate").hidden = false; $("gateError").textContent = message || "";
+    clearInterval(timer); data = null; $("password").value = ""; $("password").focus();
+  }
+  function showApp() { $("gate").hidden = true; $("app").hidden = false; }
+
+  $("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = $("unlock"); btn.disabled = true; $("gateError").textContent = "";
+    fetch("/api/usage/login", { method: "POST", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ password: $("password").value }) })
+      .then(function (res) { return res.json().then(function (body) { return { res: res, body: body }; }); })
+      .then(function (r) {
+        if (!r.res.ok) { $("gateError").textContent = r.body.detail || "Could not log in."; $("password").value = ""; return; }
+        token = r.body.token; try { sessionStorage.setItem(KEY, token); } catch (e) {}
+        $("password").value = ""; load(true);
+      })
+      .catch(function () { $("gateError").textContent = "Could not reach the voice service. Is it running?"; })
+      .then(function () { btn.disabled = false; });
+  });
+
+  $("lock").addEventListener("click", function () {
+    fetch("/api/usage/logout", { method: "POST", headers: { "Authorization": "Bearer " + token } }).catch(function () {});
+    showGate("Locked.");
+  });
+  $("refresh").addEventListener("click", function () { load(false); });
+
+  function load(first) {
+    return api("/api/usage").then(function (res) { return res.json(); }).then(function (d) {
+      data = d; showApp(); render(d);
+      if (first) { clearInterval(timer); timer = setInterval(function () { if (!document.hidden) load(false); }, 15000); }
+    }).catch(function (e) { if (e.message !== "locked") { showGate("Could not load the usage. Is the voice service running?"); } });
+  }
+
+  function table(target, headers, rows, barIndex) {
+    var box = $(target); box.textContent = "";
+    if (!rows.length) { box.appendChild(el("p", "muted", "Nothing yet.")); return; }
+    var t = el("table"), head = el("tr");
+    headers.forEach(function (h) { head.appendChild(el("th", null, h)); });
+    t.appendChild(head);
+    var max = 0; if (barIndex != null) rows.forEach(function (r) { max = Math.max(max, r[barIndex].raw || 0); });
+    rows.forEach(function (r) {
+      var tr = el("tr");
+      r.forEach(function (cell, i) {
+        var td = el("td", i === barIndex ? "barcell" : null);
+        if (i === barIndex) { var bar = el("div", "bar"); bar.style.width = (max ? Math.round(cell.raw / max * 100) : 0) + "%"; td.appendChild(bar); td.appendChild(el("span", null, cell.text)); }
+        else if (cell && cell.cls) { td.className = cell.cls; td.textContent = cell.text; }
+        else td.textContent = (cell && cell.text != null) ? cell.text : cell;
+        tr.appendChild(td);
+      });
+      t.appendChild(tr);
+    });
+    box.appendChild(t);
+  }
+
+  function render(d) {
+    var chips = $("chips"); chips.textContent = "";
+    chips.appendChild(el("span", "chip", "model " + d.service.model));
+    chips.appendChild(el("span", "chip", "voice " + d.service.voice));
+    chips.appendChild(el("span", "chip " + (d.service.key_configured ? "ok" : "bad"), d.service.key_configured ? "API key set" : "API key missing"));
+    chips.appendChild(el("span", "chip", "key " + (d.key_suffixes.join(", ") || "none yet")));
+    if (d.service.mock) chips.appendChild(el("span", "chip bad", "mock mode: no real calls"));
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+
+    deadline = new Date(d.deadline); tickCountdown();
+    $("deadlineText").textContent = deadline.toLocaleString([], { dateStyle: "full", timeStyle: "short" }) + " (Toronto time: Sunday Sept 20, 11:59 PM)";
+
+    var t = d.totals, cards = $("cards"); cards.textContent = "";
+    function card(label, value, sub) { var c = el("div", "card"); c.appendChild(el("div", "label", label)); c.appendChild(el("div", "value", value)); c.appendChild(el("div", "sub", sub || "")); cards.appendChild(c); }
+    card("Total tokens used", fmt(t.total), fmt(t.input) + " in, " + fmt(t.output) + " out");
+    card("Calls", fmt(t.calls), fmt(t.ok) + " ok, " + fmt(t.failed) + " failed");
+    card("Unknown usage", fmt(t.no_usage_calls), "calls with no token count (unknown, not zero)");
+    card("Last call", d.period ? d.period.last.slice(11) : "none", d.period ? d.period.last.slice(0, 10) : "");
+
+    renderAllocation();
+
+    table("byPurpose", ["Purpose", "Calls", "Failed", "Tokens"],
+      d.by_purpose.map(function (g) { return [g.name, fmt(g.calls), fmt(g.failed), { raw: g.total, text: fmt(g.total) }]; }), 3);
+    table("byModel", ["Model", "Calls", "Failed", "Tokens"],
+      d.by_model.map(function (g) { return [g.name, fmt(g.calls), fmt(g.failed), { raw: g.total, text: fmt(g.total) }]; }), 3);
+    table("byDay", ["Day", "Calls", "Failed", "Tokens"],
+      d.by_day.map(function (g) { return [g.name, fmt(g.calls), fmt(g.failed), { raw: g.total, text: fmt(g.total) }]; }), 3);
+    table("recent", ["When", "Purpose", "Model", "Result", "Tokens", "Seconds"],
+      d.recent.map(function (r) { return [r.when, r.purpose, r.model, { text: r.ok ? "ok" : "failed " + (r.status || ""), cls: r.ok ? "ok" : "bad" },
+                                          r.tokens == null ? "unknown" : fmt(r.tokens), r.latency_s == null ? "" : String(r.latency_s)]; }));
+
+    var files = $("files"); files.textContent = "";
+    d.files.forEach(function (f) {
+      var li = el("li"); var left = el("span");
+      left.appendChild(el("strong", null, f.name));
+      left.appendChild(el("span", "muted", f.exists ? "  " + fmt(f.bytes) + " bytes, made " + f.modified : "  not generated yet"));
+      li.appendChild(left);
+      var b = el("button", null, "Download"); b.type = "button"; b.disabled = !f.exists; b.dataset.file = f.name; li.appendChild(b);
+      files.appendChild(li);
+    });
+
+    var checks = $("checks"); checks.textContent = "";
+    d.checks.forEach(function (c) {
+      var li = el("li"); li.appendChild(el("strong", c.ok ? "ok" : "bad", (c.ok ? "✓ " : "✗ ") + c.name));
+      li.appendChild(el("div", "muted", c.detail)); checks.appendChild(li);
+    });
+    var gaps = $("gaps"); gaps.textContent = "";
+    d.known_gaps.forEach(function (g) { gaps.appendChild(el("li", null, g)); });
+    d.failed_calls.forEach(function (f) { gaps.appendChild(el("li", null, "Failed call, no usage: " + f.when.slice(11) + " " + f.purpose + " (" + f.reason + ")")); });
+    var sources = $("sources"); sources.textContent = "";
+    d.sources.forEach(function (s) { sources.appendChild(el("li", s.found ? null : "bad", s.label + ": " + (s.found ? s.records + " records, " + s.new + " new after removing duplicates" : "file not found"))); });
+
+    var draft = $("draft"); if (!draft.dataset.edited) draft.value = d.email_draft;
+  }
+
+  $("draft").addEventListener("input", function () { this.dataset.edited = "1"; });
+
+  function tickCountdown() {
+    if (!deadline) return;
+    var ms = deadline - new Date();
+    if (ms <= 0) { $("countdown").textContent = "the deadline has passed"; return; }
+    var m = Math.floor(ms / 60000), d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+    $("countdown").textContent = (d ? d + "d " : "") + h + "h " + (m % 60) + "m left";
+  }
+  setInterval(tickCountdown, 30000);
+
+  function renderAllocation() {
+    var stored = null; try { stored = localStorage.getItem(ALLOC); } catch (e) {}
+    if (stored && !$("allocation").value) $("allocation").value = stored;
+    var alloc = Number($("allocation").value), used = data ? data.totals.total : 0;
+    var wrap = $("progressWrap");
+    if (!alloc || alloc <= 0) { wrap.hidden = true; $("allocationText").textContent = ""; return; }
+    var pct = Math.min(100, used / alloc * 100);
+    wrap.hidden = false; $("progressBar").style.width = pct + "%";
+    $("allocationText").textContent = fmt(used) + " of " + fmt(alloc) + " used (" + pct.toFixed(2) + "%), " + fmt(Math.max(0, alloc - used)) + " left";
+  }
+  $("allocation").addEventListener("input", function () { try { localStorage.setItem(ALLOC, this.value); } catch (e) {} renderAllocation(); });
+
+  $("generate").addEventListener("click", function () {
+    var btn = this; btn.disabled = true; $("generateMsg").textContent = "Generating…"; $("generateMsg").className = "";
+    api("/api/usage/report", { method: "POST", body: JSON.stringify({ redact_paths: $("redact").checked }) })
+      .then(function (res) { return res.json(); })
+      .then(function (r) {
+        $("generateMsg").textContent = r.ok ? r.message + " " + fmt(r.totals.calls) + " calls, " + fmt(r.totals.total_tokens) + " tokens." : (r.message || "Failed.");
+        $("generateMsg").className = r.ok ? "ok" : "bad";
+        delete $("draft").dataset.edited; return load(false);
+      })
+      .catch(function (e) { if (e.message !== "locked") { $("generateMsg").textContent = "Could not generate the files."; $("generateMsg").className = "bad"; } })
+      .then(function () { btn.disabled = false; });
+  });
+
+  $("files").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b || !b.dataset.file) return;
+    api("/api/usage/files/" + encodeURIComponent(b.dataset.file)).then(function (res) { return res.blob(); }).then(function (blob) {
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = b.dataset.file;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    }).catch(function () {});
+  });
+
+  $("copyDraft").addEventListener("click", function () {
+    var text = $("draft").value;
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
+      function () { $("copyMsg").textContent = "Copied."; },
+      function () { $("draft").select(); $("copyMsg").textContent = "Press Ctrl+C to copy the selected text."; });
+    setTimeout(function () { $("copyMsg").textContent = ""; }, 3000);
+  });
+
+  if (token) load(true).catch(function () {}); else $("password").focus();
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+import type { VisionCheckResult } from "./types";
+
 /** Client for the voice service (see /voice and docs/omni-voice.md). */
 export const VOICE_API_URL =
   process.env.NEXT_PUBLIC_VOICE_API_URL ?? "http://localhost:8000";
@@ -79,4 +81,32 @@ export async function speakText(
     signal,
   });
   return readReply(response);
+}
+
+/**
+ * "Check my step": send a camera photo (a JPEG data URI) and the current step; get back whether
+ * it looks done and what to say about it. Feedback is English; speak it with speakText to translate.
+ */
+export async function checkStepWithVision(
+  imageDataUrl: string,
+  step: string,
+  who: Pick<Speaker, "name" | "style">,
+  signal?: AbortSignal,
+): Promise<VisionCheckResult> {
+  const response = await fetch(`${VOICE_API_URL}/api/vision/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      image: imageDataUrl,
+      step,
+      assistant_name: who.name,
+      style: who.style,
+    }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Voice service error ${response.status}`);
+  }
+  const data = (await response.json()) as { passed?: boolean | null; feedback?: string };
+  return { passed: data.passed === true, feedback: data.feedback ?? "" };
 }
