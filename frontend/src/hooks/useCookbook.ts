@@ -1,30 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   allRecipes,
-  loadCookbook,
-  saveCookbook,
-  type CookbookState,
+  emptyCookbook,
+  getCookbookSnapshot,
+  subscribeCookbook,
+  updateCookbook,
 } from "@/lib/cookbook-storage";
 import type { Recipe } from "@/lib/types";
 
 export function useCookbook() {
-  const [state, setState] = useState<CookbookState>({
-    savedIds: [],
-    extraRecipes: [],
-  });
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    setState(loadCookbook());
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    saveCookbook(state);
-  }, [ready, state]);
+  // Server render and hydration see an empty cookbook; the browser then switches to the saved one.
+  const state = useSyncExternalStore(
+    subscribeCookbook,
+    getCookbookSnapshot,
+    () => emptyCookbook,
+  );
 
   const recipes = useMemo(
     () => allRecipes(state.extraRecipes),
@@ -42,7 +34,7 @@ export function useCookbook() {
   );
 
   const toggleSave = useCallback((recipe: Recipe) => {
-    setState((current) => {
+    updateCookbook((current) => {
       const saved = current.savedIds.includes(recipe.id);
       return {
         extraRecipes: current.extraRecipes.some((item) => item.id === recipe.id)
@@ -58,7 +50,7 @@ export function useCookbook() {
   }, []);
 
   const addGeneratedRecipe = useCallback((recipe: Recipe) => {
-    setState((current) => ({
+    updateCookbook((current) => ({
       extraRecipes: [
         recipe,
         ...current.extraRecipes.filter((item) => item.id !== recipe.id),
@@ -70,7 +62,6 @@ export function useCookbook() {
   }, []);
 
   return {
-    ready,
     recipes,
     savedRecipes,
     isSaved,

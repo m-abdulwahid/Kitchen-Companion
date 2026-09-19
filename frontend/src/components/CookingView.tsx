@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pip } from "@/components/Pip";
+import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { ASSISTANT } from "@/lib/assistant";
-import { answerCookingQuestion, checkStepWithVision } from "@/lib/mocks";
+import { checkStepWithVision } from "@/lib/mocks";
 import type { Recipe } from "@/lib/types";
 
 type CookingViewProps = {
@@ -11,32 +12,47 @@ type CookingViewProps = {
   onExit: () => void;
 };
 
-function speak(text: string) {
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1.02;
-  window.speechSynthesis.speak(utterance);
-}
+const ASK_LABELS: Record<VoiceState, string> = {
+  idle: `Ask ${ASSISTANT.name}`,
+  recording: "Listening… tap to send",
+  thinking: `${ASSISTANT.name} is thinking…`,
+  speaking: `${ASSISTANT.name} is talking — tap to interrupt`,
+};
 
-function getSpeechRecognition(): SpeechRecognition | null {
-  const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-  if (!Ctor) return null;
-  return new Ctor();
-}
+type PipMood = "idle" | "talk" | "listen" | "cheer";
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [status, setStatus] = useState("Camera warming up…");
-  const [listening, setListening] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [pipMood, setPipMood] = useState<"idle" | "talk" | "listen" | "cheer">(
-    "idle",
+  // A mood belongs to the step it was set on, so it falls back to idle when the step changes.
+  const [moodState, setMoodState] = useState<{ mood: PipMood; stepIndex: number }>(
+    { mood: "idle", stepIndex: 0 },
   );
+  const pipMood = moodState.stepIndex === stepIndex ? moodState.mood : "idle";
+  const setPipMood = (mood: PipMood) => setMoodState({ mood, stepIndex });
+  // All of Pip's talking, and the user's questions, go through the voice service (Omni).
+  const {
+    state: voiceState,
+    toggle: toggleVoice,
+    speak,
+  } = useVoiceAssistant({ onReply: setStatus, onError: setStatus });
+  const shownMood =
+    voiceState === "recording"
+      ? "listen"
+      : voiceState === "speaking"
+        ? "talk"
+        : pipMood;
 
   const step = recipe.steps[stepIndex];
+  // One string for the auto-read and "Repeat aloud", so a repeat is served from the voice service's cache.
+  const stepSpeech = `Step ${stepIndex + 1}. ${step}`;
+  // The next step, so its audio is ready before the user gets there.
+  const upcomingSpeech =
+    stepIndex + 1 < recipe.steps.length
+      ? `Step ${stepIndex + 2}. ${recipe.steps[stepIndex + 1]}`
+      : undefined;
 
   useEffect(() => {
     let stream: MediaStream | undefined;
@@ -62,17 +78,13 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((track) => track.stop());
-      window.speechSynthesis.cancel();
-      recognitionRef.current?.stop();
     };
   }, []);
 
+  // Pip's "talk" mood while speaking comes from the voice state (shownMood above).
   useEffect(() => {
-    setPipMood("talk");
-    speak(`Step ${stepIndex + 1}. ${step}`);
-    const timer = window.setTimeout(() => setPipMood("idle"), 2500);
-    return () => window.clearTimeout(timer);
-  }, [step, stepIndex]);
+    speak(stepSpeech, upcomingSpeech);
+  }, [stepSpeech, upcomingSpeech, speak]);
 
   async function captureAndCheck() {
     const video = videoRef.current;
@@ -89,37 +101,6 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     speak(result.feedback);
     setChecking(false);
     setPipMood(result.passed ? "cheer" : "idle");
-  }
-
-  function startListening() {
-    const recognition = getSpeechRecognition();
-    if (!recognition) {
-      setStatus("Speech recognition needs Chrome / Edge (webkitSpeechRecognition).");
-      return;
-    }
-    recognition.lang = "en-US";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.onresult = async (event) => {
-      const question = event.results[0]?.[0]?.transcript ?? "";
-      setTranscript(question);
-      setListening(false);
-      setPipMood("talk");
-      const answer = await answerCookingQuestion(question, recipe, step);
-      setStatus(answer);
-      speak(answer);
-      setPipMood("idle");
-    };
-    recognition.onerror = () => {
-      setListening(false);
-      setPipMood("idle");
-      setStatus("Didn’t catch that — tap Ask Pip and try again.");
-    };
-    recognition.onend = () => setListening(false);
-    recognitionRef.current = recognition;
-    setListening(true);
-    setPipMood("listen");
-    recognition.start();
   }
 
   function nextStep() {
@@ -180,7 +161,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              onClick={() => speak(step)}
+              onClick={() => speak(stepSpeech)}
               className="rounded-2xl bg-peach py-3 font-semibold text-cocoa"
             >
               Repeat aloud
@@ -195,21 +176,15 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              onClick={startListening}
-              className="col-span-2 rounded-2xl border-2 border-tomato py-3 font-semibold text-tomato"
+              disabled={voiceState === "thinking"}
+              onClick={() => toggleVoice(step)}
+              className="col-span-2 rounded-2xl border-2 border-tomato py-3 font-semibold text-tomato disabled:opacity-60"
             >
-              {listening ? "Listening…" : `Ask ${ASSISTANT.name}`}
+              {ASK_LABELS[voiceState]}
             </button>
           </div>
         </div>
-        <Pip
-          mood={pipMood}
-          message={
-            transcript
-              ? `You asked: “${transcript}” — ${status}`
-              : status
-          }
-        />
+        <Pip mood={shownMood} message={status} />
       </div>
     </section>
   );

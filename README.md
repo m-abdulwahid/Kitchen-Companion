@@ -37,6 +37,8 @@ Kitchen-Companion/
 | Frontend | `cd frontend && npm install && npm run dev` |
 | Voice | see [voice/README.md](voice/README.md) |
 
+"Ask Pip" needs the voice service running on port 8000; how it all connects: [docs/voice-integration.md](docs/voice-integration.md).
+
 ## Merging without breaking things
 
 - Pull before you start work and again before you push: `git pull`.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CookingView } from "@/components/CookingView";
 import { RecipeBrowser } from "@/components/RecipeBrowser";
 import { RecipeDetail } from "@/components/RecipeDetail";
@@ -11,23 +11,27 @@ type KitchenFlowProps = {
   mode: "explore" | "cookbook";
 };
 
+// The ?recipe=<id> from a shared link. Read as an external value (null while rendering on the server).
+function readSharedId() {
+  return new URLSearchParams(window.location.search).get("recipe");
+}
+const neverChanges = () => () => {};
+
 export function KitchenFlow({ mode }: KitchenFlowProps) {
   const cookbook = useCookbook();
-  const [selected, setSelected] = useState<Recipe | null>(null);
+  const [picked, setPicked] = useState<Recipe | null>(null);
+  const [leftSharedRecipe, setLeftSharedRecipe] = useState(false);
   const [cooking, setCooking] = useState(false);
 
   const list = mode === "cookbook" ? cookbook.savedRecipes : cookbook.recipes;
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const sharedId = params.get("recipe");
-    if (!sharedId || !cookbook.ready) return;
-    const match = cookbook.recipes.find((recipe) => recipe.id === sharedId);
-    if (match) {
-      setSelected(match);
-      setCooking(false);
-    }
-  }, [cookbook.ready, cookbook.recipes]);
+  // A shared link opens its recipe until the user goes back to browsing.
+  const sharedId = useSyncExternalStore(neverChanges, readSharedId, () => null);
+  const sharedRecipe =
+    sharedId && !leftSharedRecipe
+      ? (cookbook.recipes.find((recipe) => recipe.id === sharedId) ?? null)
+      : null;
+  const selected = picked ?? sharedRecipe;
 
   if (cooking && selected) {
     return (
@@ -43,7 +47,10 @@ export function KitchenFlow({ mode }: KitchenFlowProps) {
       <RecipeDetail
         recipe={selected}
         saved={cookbook.isSaved(selected.id)}
-        onBack={() => setSelected(null)}
+        onBack={() => {
+          setPicked(null);
+          setLeftSharedRecipe(true);
+        }}
         onSave={() => cookbook.toggleSave(selected)}
         onStartCooking={() => setCooking(true)}
       />
@@ -54,7 +61,7 @@ export function KitchenFlow({ mode }: KitchenFlowProps) {
     <RecipeBrowser
       recipes={list}
       savedIds={cookbook.savedRecipes.map((recipe) => recipe.id)}
-      onOpen={setSelected}
+      onOpen={setPicked}
       heading={mode === "cookbook" ? "My cookbook" : "What’s cooking?"}
       subheading={
         mode === "cookbook"
