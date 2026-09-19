@@ -7,8 +7,9 @@ import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
-import { checkStepWithVision } from "@/lib/mocks";
+import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import type { Recipe } from "@/lib/types";
+import { checkStepWithVision } from "@/lib/voice-api";
 
 type CookingViewProps = {
   recipe: Recipe;
@@ -41,6 +42,8 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [status, setStatus] = useState("Camera warming up…");
   const [checking, setChecking] = useState(false);
+  const [cameraProblem, setCameraProblem] = useState("");
+  const [cameraTry, setCameraTry] = useState(0);
   const [moodState, setMoodState] = useState<{ mood: RemyMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
   );
@@ -96,8 +99,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     let stream: MediaStream | undefined;
     let cancelled = false;
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
+    requestCamera()
       .then((media) => {
         if (cancelled) {
           media.getTracks().forEach((track) => track.stop());
@@ -107,17 +109,21 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = media;
         }
+        setCameraProblem("");
         setStatus("Live camera on. Talk to Remy whenever you need him.");
       })
-      .catch(() => {
-        setStatus("Camera blocked — allow the webcam so Remy can watch the pan.");
+      .catch((error) => {
+        if (cancelled) return;
+        // say what actually went wrong: a blocked permission, a busy camera and a missing one need different fixes
+        setCameraProblem(describeCameraError(error));
+        setStatus("Remy can't see the pan yet. Fix the camera and press Try again.");
       });
 
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [cameraTry]);
 
   useEffect(() => {
     // Live mode already has the current step in its prompt; avoid an extra HTTP
@@ -135,16 +141,20 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     canvas.height = video.videoHeight || 480;
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const result = await checkStepWithVision(
-      imageDataUrl,
-      step,
-      stepIndex,
-      companion.name,
-    );
-    setStatus(result.feedback);
-    speak(result.feedback);
-    setChecking(false);
-    setRemyMood(result.passed ? "cheer" : "idle");
+    try {
+      const result = await checkStepWithVision(imageDataUrl, step, {
+        name: companion.name,
+        style: companion.style,
+      });
+      setStatus(result.feedback);
+      speak(result.feedback);
+      setRemyMood(result.passed ? "cheer" : "idle");
+    } catch {
+      setStatus(`${companion.name} couldn’t check that step. Is the voice service running?`);
+      setRemyMood("idle");
+    } finally {
+      setChecking(false);
+    }
   }
 
   function nextStep() {
@@ -174,6 +184,25 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             Exit
           </button>
         </div>
+        {cameraProblem ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 bg-raspberry/90 px-5 py-3 text-sm text-cream"
+          >
+            <span className="max-w-xl">{cameraProblem}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setCameraProblem("");
+                setStatus("Camera warming up…");
+                setCameraTry((count) => count + 1);
+              }}
+              className="rounded-full bg-cream px-4 py-1.5 font-semibold text-raspberry"
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
         <video
           ref={videoRef}
           autoPlay

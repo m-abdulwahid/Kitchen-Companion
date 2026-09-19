@@ -65,3 +65,8 @@ The VAD probe streams 24 kHz mono PCM16 from `voice/samples/voice_test.wav` and 
 | JPEG image item in-session | Fail | After `conversation.item.created`, the service returned `COMMON_ERROR`: `InternalError.Algo.InvalidParameter: Invalid video file.` No response was produced. |
 
 Gate decision: **Path B (hybrid HTTP vision)**. Realtime audio and VAD are supported; frame analysis stays on the existing HTTP-capable vision model and injects concise verdicts into the live conversation. This result is sufficient for the demo architecture, so do not spend credits attempting the 56-voice sweep or alternate image encodings unless Path B later proves inadequate.
+
+### image (stream=False, `scripts/probe_vision.py`)
+- Format that works: `messages[].content` with an `{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}` block plus a text block. Confirmed 2026-09-19 (HTTP 200, about 2 s).
+- A 640x480 JPEG costs about 300 `image_tokens`. Two photos in one message work too.
+- It reads what is in the picture (pale translucent onion slices, a green screen with a timer). With a plain prompt it was too agreeable and called pale onions "golden"; `voice/vision.py` asks for a clear result before it answers `passed: true`.
