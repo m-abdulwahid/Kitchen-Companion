@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { askVoice, speakText } from "@/lib/voice-api";
+import { DEFAULT_LANGUAGE } from "@/lib/languages";
+import { askVoice, speakText, type Speaker } from "@/lib/voice-api";
 
 export type VoiceState = "idle" | "recording" | "thinking" | "speaking";
 
@@ -10,6 +11,10 @@ type Options = {
   onReply: (text: string) => void;
   /** Called with a short user-facing message when something goes wrong. */
   onError: (message: string) => void;
+  /** Called with the translated text when something is read aloud in a non-English language. */
+  onSpoken?: (text: string) => void;
+  /** Who is talking: the chosen companion's voice, name and personality, and the language. */
+  companion: Speaker;
 };
 
 const MIN_RECORDING_MS = 500;
@@ -27,16 +32,16 @@ function newSessionId(): string {
 }
 
 /**
- * Pip's voice, both directions, one audio player.
+ * Remy's voice, both directions, one audio player.
  * - toggle(step): tap-to-talk. First call starts recording, second sends it; the spoken
- *   reply plays automatically. Calling it while Pip is talking interrupts and records.
- * - speak(text, upcoming?): Pip reads text aloud (recipe steps, feedback). Ignored while the
+ *   reply plays automatically. Calling it while Remy is talking interrupts and records.
+ * - speak(text, upcoming?): Remy reads text aloud (recipe steps, feedback). Ignored while the
  *   user is asking a question; a newer speak() replaces an older one. If `upcoming` is given
  *   (the next step), its audio is fetched in the background once this one has arrived, so the
  *   voice service has it cached by the time the user moves on.
  * Both use the voice service (Omni) and fall back to the browser's voice if it fails.
  */
-export function useVoiceAssistant({ onReply, onError }: Options) {
+export function useVoiceAssistant({ onReply, onError, onSpoken, companion }: Options) {
   const [state, setState] = useState<VoiceState>("idle");
   const stateRef = useRef<VoiceState>("idle");
   const sessionIdRef = useRef<string | null>(null);
@@ -50,10 +55,12 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
   const stepRef = useRef("");
   const startedAtRef = useRef(0);
   const maxTimerRef = useRef<number | null>(null);
-  const callbacksRef = useRef({ onReply, onError });
+  const callbacksRef = useRef({ onReply, onError, onSpoken });
+  const companionRef = useRef(companion);
 
   useEffect(() => {
-    callbacksRef.current = { onReply, onError };
+    callbacksRef.current = { onReply, onError, onSpoken };
+    companionRef.current = companion;
   });
 
   const changeState = useCallback((next: VoiceState) => {
@@ -73,7 +80,7 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
     window.speechSynthesis?.cancel();
   }, []);
 
-  /** Stop anything Pip is saying or about to say. */
+  /** Stop anything Remy is saying or about to say. */
   const interruptSpeech = useCallback(() => {
     speakAbortRef.current?.abort();
     speakAbortRef.current = null;
@@ -124,9 +131,11 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
 
   /** Ask the voice service to generate (and cache) audio we don't need yet. Errors are ignored. */
   const prefetch = useCallback((text: string) => {
-    if (prefetchedRef.current.has(text)) return;
-    prefetchedRef.current.add(text);
-    speakText(text).catch(() => prefetchedRef.current.delete(text));
+    const { voice, language } = companionRef.current;
+    const key = `${voice}|${language}|${text}`;
+    if (prefetchedRef.current.has(key)) return;
+    prefetchedRef.current.add(key);
+    speakText(text, voice, language).catch(() => prefetchedRef.current.delete(key));
   }, []);
 
   const speak = useCallback(
@@ -138,9 +147,14 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
       const controller = new AbortController();
       speakAbortRef.current = controller;
       try {
-        const reply = await speakText(text, controller.signal);
+        const { voice, language } = companionRef.current;
+        const reply = await speakText(text, voice, language, controller.signal);
         if (controller.signal.aborted) return;
-        playReply(text, reply.audio, reply.audioMime);
+        // Show what is being said when it was translated.
+        if (language !== DEFAULT_LANGUAGE.code && reply.text) {
+          callbacksRef.current.onSpoken?.(reply.text);
+        }
+        playReply(reply.text || text, reply.audio, reply.audioMime);
         if (upcoming) prefetch(upcoming);
       } catch {
         if (controller.signal.aborted) return;
@@ -161,6 +175,7 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
           recording,
           sessionIdRef.current,
           stepRef.current,
+          companionRef.current,
           controller.signal,
         );
         if (controller.signal.aborted) return;
@@ -172,7 +187,7 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
         callbacksRef.current.onError(
           error instanceof TypeError
             ? "Can't reach the voice service — is it running?"
-            : "Pip couldn't answer that — try again.",
+            : `${companionRef.current.name} couldn't answer that — try again.`,
         );
       }
     },
@@ -195,7 +210,9 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
         audio: true,
       });
     } catch {
-      callbacksRef.current.onError("Mic blocked — allow the microphone to ask Pip.");
+      callbacksRef.current.onError(
+        `Mic blocked — allow the microphone to ask ${companionRef.current.name}.`,
+      );
       return;
     }
     const mimeType = pickMimeType();
@@ -224,7 +241,7 @@ export function useVoiceAssistant({ onReply, onError }: Options) {
     maxTimerRef.current = window.setTimeout(stopRecording, MAX_RECORDING_MS);
   }, [changeState, interruptSpeech, releaseMic, send, stopRecording]);
 
-  /** Pass the current recipe step so Pip answers in context. */
+  /** Pass the current recipe step so Remy answers in context. */
   const toggle = useCallback(
     (currentStep: string) => {
       stepRef.current = currentStep;

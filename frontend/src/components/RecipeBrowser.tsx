@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RecipeGrid } from "@/components/RecipeGrid";
 import type { DietTag, Recipe } from "@/lib/types";
 
@@ -18,6 +18,7 @@ type RecipeBrowserProps = {
   heading: string;
   subheading: string;
   emptyMessage: string;
+  live?: boolean;
 };
 
 export function RecipeBrowser({
@@ -27,26 +28,58 @@ export function RecipeBrowser({
   heading,
   subheading,
   emptyMessage,
+  live = false,
 }: RecipeBrowserProps) {
   const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [diets, setDiets] = useState<DietTag[]>([]);
+  const [remote, setRemote] = useState<Recipe[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const filtered = useMemo(() => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(query.trim()), 280);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (!live) return;
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (debounced.includes(",")) params.set("ingredients", debounced);
+    else if (debounced) params.set("search", debounced);
+    if (diets[0]) params.set("dietary_tags", diets[0]);
+    setLoading(true);
+    fetch(`/api/recipes?${params.toString()}`)
+      .then((response) => response.json())
+      .then((data: { recipes?: Recipe[] }) => {
+        if (!cancelled) setRemote(data.recipes ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRemote(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced, diets, live]);
+
+  const filteredLocal = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return recipes.filter((recipe) => {
       const matchesDiet =
         diets.length === 0 || diets.every((diet) => recipe.diets.includes(diet));
-      const haystack = [
-        recipe.title,
-        recipe.description,
-        ...recipe.ingredients,
-      ]
+      const haystack = [recipe.title, recipe.description, ...recipe.ingredients]
         .join(" ")
         .toLowerCase();
-      const matchesSearch = needle.length === 0 || haystack.includes(needle);
-      return matchesDiet && matchesSearch;
+      return (needle.length === 0 || haystack.includes(needle)) && matchesDiet;
     });
   }, [diets, query, recipes]);
+
+  const shown = (live ? remote ?? recipes : filteredLocal).filter((recipe) =>
+    diets.length <= 1 ? true : diets.every((diet) => recipe.diets.includes(diet)),
+  );
 
   function toggleDiet(diet: DietTag) {
     setDiets((current) =>
@@ -64,11 +97,11 @@ export function RecipeBrowser({
       </div>
       <div className="mb-6 rounded-[2rem] bg-white/80 p-4 shadow-[0_8px_24px_rgba(107,63,42,0.06)]">
         <label className="block text-sm font-semibold text-cocoa">
-          Search ingredients
+          Search recipes or ingredients
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="tomato, chickpeas, gochujang…"
+            placeholder="pasta, tomato, chickpeas…"
             className="mt-2 w-full rounded-2xl border border-peach bg-cream px-4 py-3 text-base text-espresso outline-none ring-tomato/30 placeholder:text-caramel/70 focus:ring-4"
           />
         </label>
@@ -92,8 +125,11 @@ export function RecipeBrowser({
           })}
         </div>
       </div>
+      {loading ? (
+        <p className="mb-3 text-sm font-semibold text-caramel">Finding dishes…</p>
+      ) : null}
       <RecipeGrid
-        recipes={filtered}
+        recipes={shown}
         savedIds={savedIds}
         onOpen={onOpen}
         emptyMessage={emptyMessage}

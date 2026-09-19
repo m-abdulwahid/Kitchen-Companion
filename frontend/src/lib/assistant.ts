@@ -1,5 +1,4 @@
-/** Rename-friendly identity for the Ratatouille-like sous-chef. */
 export const ASSISTANT = {
-  name: "Pip",
-  tagline: "tiny sous-chef with big opinions",
+  name: "Remy",
+  tagline: "tiny rat chef with a wooden spoon and big opinions",
 } as const;

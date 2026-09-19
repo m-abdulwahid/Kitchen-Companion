@@ -1,5 +1,5 @@
-# Kitchen-Companion
-Kitchen Companion turns whatever's in your fridge into a live, voice-guided recipe, with an AI that watches you cook and answers questions in real time.
+# Whisker
+Whisker turns whatever's in your fridge into a live, voice-guided recipe, with Remy — a tiny rat chef — watching you cook and answering questions in real time.
 
 ## Folder layout
 
@@ -12,7 +12,7 @@ Kitchen-Companion/
 │   └── samples/      test audio
 ├── backend/      Backend service (TBD)
 ├── vision/       Camera "check my step" service (TBD)
-├── docs/         Notes and write-ups
+├── docs/         Notes and write-ups (start with docs/status.md: what is real vs placeholder)
 ├── scripts/      One-off helper scripts
 ├── examples/     Vendor API examples (read-only reference)
 ├── artifacts/    API call audit log (written by the services)
@@ -37,7 +37,9 @@ Kitchen-Companion/
 | Frontend | `cd frontend && npm install && npm run dev` |
 | Voice | see [voice/README.md](voice/README.md) |
 
-"Ask Pip" needs the voice service running on port 8000; how it all connects: [docs/voice-integration.md](docs/voice-integration.md).
+With the voice service running, browse Remy's voices at http://localhost:8000/voices.
+
+"Ask Remy" needs the voice service running on port 8000; how it all connects: [docs/voice-integration.md](docs/voice-integration.md).
 
 ## Merging without breaking things
 
