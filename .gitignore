@@ -1,0 +1,11 @@
+# secrets: real keys live in .env, share .env.example instead
+.env
+.env.local
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# node
+node_modules/
