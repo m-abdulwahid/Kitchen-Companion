@@ -6,6 +6,7 @@ import { Remy } from "@/components/Remy";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
+import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import type { Recipe } from "@/lib/types";
 import { checkStepWithVision } from "@/lib/voice-api";
 
@@ -30,6 +31,8 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [status, setStatus] = useState("Camera warming up…");
   const [checking, setChecking] = useState(false);
+  const [cameraProblem, setCameraProblem] = useState("");
+  const [cameraTry, setCameraTry] = useState(0);
   const [moodState, setMoodState] = useState<{ mood: RemyMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
   );
@@ -70,8 +73,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     let stream: MediaStream | undefined;
     let cancelled = false;
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
+    requestCamera()
       .then((media) => {
         if (cancelled) {
           media.getTracks().forEach((track) => track.stop());
@@ -81,17 +83,21 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = media;
         }
+        setCameraProblem("");
         setStatus("Live camera on. Talk to Remy whenever you need him.");
       })
-      .catch(() => {
-        setStatus("Camera blocked — allow the webcam so Remy can watch the pan.");
+      .catch((error) => {
+        if (cancelled) return;
+        // say what actually went wrong: a blocked permission, a busy camera and a missing one need different fixes
+        setCameraProblem(describeCameraError(error));
+        setStatus("Remy can't see the pan yet. Fix the camera and press Try again.");
       });
 
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [cameraTry]);
 
   useEffect(() => {
     speak(stepSpeech, upcomingSpeech);
@@ -150,6 +156,25 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             Exit
           </button>
         </div>
+        {cameraProblem ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 bg-raspberry/90 px-5 py-3 text-sm text-cream"
+          >
+            <span className="max-w-xl">{cameraProblem}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setCameraProblem("");
+                setStatus("Camera warming up…");
+                setCameraTry((count) => count + 1);
+              }}
+              className="rounded-full bg-cream px-4 py-1.5 font-semibold text-raspberry"
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
         <video
           ref={videoRef}
           autoPlay
