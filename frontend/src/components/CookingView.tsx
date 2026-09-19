@@ -6,8 +6,8 @@ import { Remy } from "@/components/Remy";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
-import { checkStepWithVision } from "@/lib/mocks";
 import type { Recipe } from "@/lib/types";
+import { checkStepWithVision } from "@/lib/voice-api";
 
 type CookingViewProps = {
   recipe: Recipe;
@@ -107,16 +107,20 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     canvas.height = video.videoHeight || 480;
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const result = await checkStepWithVision(
-      imageDataUrl,
-      step,
-      stepIndex,
-      companion.name,
-    );
-    setStatus(result.feedback);
-    speak(result.feedback);
-    setChecking(false);
-    setRemyMood(result.passed ? "cheer" : "idle");
+    try {
+      const result = await checkStepWithVision(imageDataUrl, step, {
+        name: companion.name,
+        style: companion.style,
+      });
+      setStatus(result.feedback);
+      speak(result.feedback);
+      setRemyMood(result.passed ? "cheer" : "idle");
+    } catch {
+      setStatus(`${companion.name} couldn’t check that step. Is the voice service running?`);
+      setRemyMood("idle");
+    } finally {
+      setChecking(false);
+    }
   }
 
   function nextStep() {

@@ -23,3 +23,8 @@
 ```text
 {"choices":[{"message":{"content":"Hey chef, how much longer should I sauté the onions?","reasoning_content":"","role":"assistant"},"finish_reason":"stop","index":0,"logprobs":null}],"object":"chat.completion","usage":{"prompt_tokens":55,"completion_tokens":14,"total_tokens":69,"prompt_tokens_details":{"audio_tokens":30,"text_tokens":25},"completion_tokens_details":{"text_tokens":14}},"created":1789793893,"system_fingerprint":null,"model":"qwen3.5-omni-flash","id":"chatcmpl-4ab49ff6-5a2a-98a0-8e96-b32ca7f91dbc"}
 ```
+
+### image (stream=False, `scripts/probe_vision.py`)
+- Format that works: `messages[].content` with an `{"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,..."}}` block plus a text block. Confirmed 2026-09-19 (HTTP 200, about 2 s).
+- A 640x480 JPEG costs about 300 `image_tokens`. Two photos in one message work too.
+- It reads what is in the picture (pale translucent onion slices, a green screen with a timer). With a plain prompt it was too agreeable and called pale onions "golden"; `voice/vision.py` asks for a clear result before it answers `passed: true`.

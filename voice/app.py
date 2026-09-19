@@ -6,10 +6,12 @@ returns Omni's answer as text plus spoken audio (see docs/omni-voice.md for how 
 from __future__ import annotations
 
 import base64
+import hmac
 import io
 import json
 import os
 import re
+import secrets
 import time
 import wave
 from collections import OrderedDict
@@ -17,12 +19,15 @@ from pathlib import Path
 from typing import Optional
 
 import httpx
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-from yibu_audit import append_audit_record
+import agent as agent_brain
+import usage as usage_data
+import vision as vision_data
+from yibu_audit import append_audit_record, normalize_usage
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -49,6 +54,7 @@ MOCK = os.getenv("VOICE_MOCK", "").lower() in {"1", "true", "yes"}
 AUDIT_LOG = ROOT / "artifacts" / "yibu_api_calls.jsonl"
 AUDIT_PURPOSE = "voice_audio_understanding"
 SPEAK_AUDIT_PURPOSE = "voice_text_to_speech"
+VISION_AUDIT_PURPOSE = "vision_step_check"
 SYSTEM_PROMPT = (
     "You are a sous-chef coaching someone who is cooking right now. Your reply will be spoken aloud. "
     "Answer in at most two short, plain sentences, under 30 words in total. "
@@ -79,6 +85,7 @@ TRANSLATE_PROMPT = (
 VOICES_FILE = Path(__file__).resolve().parent / "voices.json"
 VOICES_CHECKED_FILE = Path(__file__).resolve().parent / "voices_checked.json"
 VOICES_PAGE = Path(__file__).resolve().parent / "static" / "voices.html"
+VISION_PAGE = Path(__file__).resolve().parent / "static" / "vision.html"
 
 
 def load_json(path: Path) -> dict:
@@ -348,6 +355,89 @@ async def speak(request: SpeakRequest):
     return reply
 
 
+# ---------------------------------------------------------------------------------------------
+# Vision: "check my step". A camera photo (and optionally the recipe step) in, what Omni sees and
+# coaching out. Text reply only: the frontend speaks the feedback with /api/speak.
+# ---------------------------------------------------------------------------------------------
+class VisionRequest(BaseModel):
+    image: str  # data URI of the current frame (jpeg, png or webp)
+    # Optional: an earlier frame, so Omni can tell what the cook just did.
+    previous_image: Optional[str] = None
+    # Optional: the recipe step. Without it Omni just describes and comments ("free mode"), passed is null.
+    step: Optional[str] = None
+    assistant_name: Optional[str] = None
+    style: Optional[str] = None
+    # Optional: what it said on earlier frames, so it does not repeat itself.
+    recent: Optional[list[str]] = None
+
+
+async def ask_omni_text(messages: list[dict], purpose: str) -> str:
+    """Send messages to Omni and return its text reply (no speech; images in the messages are fine)."""
+    key = os.getenv("OMNI_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="OMNI_KEY is not configured on the server")
+
+    payload = {"model": MODEL, "messages": messages, "max_tokens": 300, "temperature": 0.2}
+    endpoint = f"{BASE_URL}/chat/completions"
+    audit = {"model": MODEL, "api_key": key, "endpoint": endpoint, "purpose": purpose,
+             "transport": "http", "audit_log": AUDIT_LOG}
+
+    started = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
+            response = await client.post(
+                endpoint, headers={"Authorization": f"Bearer {key}"}, json=payload)
+    except httpx.HTTPError as exc:
+        append_audit_record(**audit, ok=False, latency_s=time.monotonic() - started,
+                            error=f"{type(exc).__name__}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Omni request failed: {exc}")
+
+    elapsed = time.monotonic() - started
+    if response.status_code != 200:
+        append_audit_record(**audit, ok=False, status_code=response.status_code, latency_s=elapsed,
+                            error=response.text)
+        raise HTTPException(status_code=502, detail=f"Omni {response.status_code}: {response.text}")
+    body = response.json()
+    append_audit_record(**audit, ok=True, status_code=200, latency_s=elapsed, response_json=body)
+    try:
+        return body["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        raise HTTPException(status_code=502, detail="Omni reply had no message")
+
+
+@app.post("/api/vision/check")
+async def vision_check(request: VisionRequest):
+    for image in (request.image, request.previous_image):
+        problem = vision_data.image_problem(image) if image else None
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
+    step = clean_line(request.step, vision_data.MAX_STEP_CHARS)
+
+    if MOCK:
+        return {"seen": "[MOCK] a kitchen", "passed": True if step else None,
+                "feedback": "[MOCK] Looks good from here."}
+
+    messages = vision_data.build_messages(
+        request.image,
+        step,
+        clean_line(request.assistant_name, 30),
+        clean_line(request.style, 160),
+        request.previous_image or "",
+        [clean_line(line, 200) for line in (request.recent or [])[-vision_data.MAX_RECENT:]],
+    )
+    reply = await ask_omni_text(messages, VISION_AUDIT_PURPOSE)
+    verdict = vision_data.parse_verdict(reply, need_verdict=bool(step))
+    if verdict is None:
+        raise HTTPException(status_code=502, detail=f"Omni's reply was not in the expected shape: {reply[:200]!r}")
+    return verdict
+
+
+@app.get("/vision", include_in_schema=False)
+def vision_page():
+    """Live camera test page: sends frames to /api/vision/check and shows what comes back."""
+    return FileResponse(VISION_PAGE)
+
+
 @app.get("/api/voices")
 def voices():
     """The voice library: catalog, which voice is in use, and what we verified."""
@@ -377,3 +467,235 @@ def voices():
 def voices_page():
     """Voice library page: browse and preview voices."""
     return FileResponse(VOICES_PAGE)
+
+
+# ---------------------------------------------------------------------------------------------
+# Usage page (password protected). The page at /usage is an empty shell; the numbers only come from
+# /api/usage after a server-side login, so hiding a box in the page is not the protection.
+# The password is USAGE_PAGE_PASSWORD in .env. If it is not set, the page stays off.
+# ---------------------------------------------------------------------------------------------
+USAGE_PASSWORD = os.getenv("USAGE_PAGE_PASSWORD", "")
+USAGE_PAGE = Path(__file__).resolve().parent / "static" / "usage.html"
+USAGE_SESSION_SECONDS = 8 * 3600
+USAGE_MAX_FAILS = 5  # wrong passwords per address ...
+USAGE_LOCKOUT_SECONDS = 60  # ... within this window lock further tries
+usage_sessions: dict[str, float] = {}  # login token -> expiry (monotonic clock)
+usage_failures: dict[str, list[float]] = {}  # client address -> times of wrong passwords
+
+
+class LoginRequest(BaseModel):
+    password: str = ""
+
+
+class ReportRequest(BaseModel):
+    redact_paths: bool = False
+
+
+def require_usage_login(authorization: Optional[str] = Header(None)) -> None:
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    expires = usage_sessions.get(token)
+    if not expires or expires < time.monotonic():
+        usage_sessions.pop(token, None)
+        raise HTTPException(status_code=401, detail="Log in first.")
+
+
+def usage_ledgers() -> list[Path]:
+    return [usage_data.LEDGER, *usage_data.extra_ledgers()]
+
+
+@app.get("/usage", include_in_schema=False)
+def usage_page():
+    """The page itself holds no data."""
+    return FileResponse(USAGE_PAGE, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/usage/login")
+def usage_login(body: LoginRequest, request: Request):
+    if not USAGE_PASSWORD:
+        raise HTTPException(status_code=503, detail="The usage page is off. Set USAGE_PAGE_PASSWORD in .env and restart the voice service.")
+    address = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    recent = [t for t in usage_failures.get(address, []) if now - t < USAGE_LOCKOUT_SECONDS]
+    if len(recent) >= USAGE_MAX_FAILS:
+        wait = int(USAGE_LOCKOUT_SECONDS - (now - recent[0])) + 1
+        raise HTTPException(status_code=429, detail=f"Too many wrong passwords. Try again in {wait} seconds.",
+                            headers={"Retry-After": str(wait)})
+    if hmac.compare_digest(body.password.encode(), USAGE_PASSWORD.encode()):
+        usage_failures.pop(address, None)
+        token = secrets.token_urlsafe(24)
+        usage_sessions[token] = now + USAGE_SESSION_SECONDS
+        return {"token": token, "expires_in": USAGE_SESSION_SECONDS}
+    usage_failures[address] = recent + [now]
+    raise HTTPException(status_code=401, detail="Wrong password.")
+
+
+@app.post("/api/usage/logout")
+def usage_logout(authorization: Optional[str] = Header(None)):
+    usage_sessions.pop((authorization or "").removeprefix("Bearer ").strip(), None)
+    return {"ok": True}
+
+
+@app.get("/api/usage", dependencies=[Depends(require_usage_login)])
+def usage_overview():
+    """Everything the usage page shows. Contains no prompts, no audio and never the API key."""
+    rows, sources = usage_data.merge(usage_ledgers())
+    agg = usage_data.aggregate(rows)
+    failed = usage_data.failed_calls(rows)
+    return {
+        **agg,
+        "sources": sources,
+        "failed_calls": failed,
+        "known_gaps": usage_data.KNOWN_GAPS,
+        "checks": usage_data.privacy_checks(rows),
+        "files": usage_data.files_info(),
+        "email_draft": usage_data.email_draft(agg, failed, sources) if rows else "",
+        "deadline": usage_data.DEADLINE.isoformat(),
+        "service": {"model": MODEL, "voice": VOICE, "key_configured": bool(os.getenv("OMNI_KEY")), "mock": MOCK},
+    }
+
+
+@app.post("/api/usage/report", dependencies=[Depends(require_usage_login)])
+def usage_generate(body: ReportRequest):
+    """Merge the ledgers and run the organisers' summarize_usage.py to write the two files to send."""
+    rows, _ = usage_data.merge(usage_ledgers())
+    if not rows:
+        return {"ok": False, "message": "No calls recorded yet."}
+    return usage_data.generate_files(rows, redact_paths=body.redact_paths)
+
+
+@app.get("/api/usage/files/{name}", dependencies=[Depends(require_usage_login)])
+def usage_file(name: str):
+    data = usage_data.read_summary_file(name)  # only the two report files can be read
+    if data is None:
+        raise HTTPException(status_code=404, detail="Generate the files first.")
+    media = "application/json" if name.endswith(".json") else "text/csv"
+    return Response(content=data, media_type=media, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+# ---------------------------------------------------------------------------------------------
+# Cooking agent: one endpoint for everything the assistant reacts to. The cook speaks, a camera
+# check arrives, or a timer finishes; it returns what it heard and saw, what to say, and actions
+# for the app to carry out (next step, timer, ...). The rules live in agent.py; see docs/agent.md.
+# ---------------------------------------------------------------------------------------------
+AGENT_EVENTS = {"speech", "frame", "text", "timer_done"}
+AGENT_AUDIO_FORMATS = {"webm", "mp4", "ogg", "wav", "mp3"}
+MAX_AGENT_AUDIO_CHARS = 4_000_000  # base64 characters; a 15 second recording is about 0.3 million
+
+
+class AgentRecipe(BaseModel):
+    title: str = ""
+    steps: list[str]
+    ingredients: list[str] = []
+    servings: Optional[int] = None
+
+
+class AgentTimer(BaseModel):
+    label: str = "timer"
+    seconds_left: int = 0
+
+
+class AgentTurnRequest(BaseModel):
+    session_id: str
+    event: str  # speech | frame | text | timer_done
+    recipe: AgentRecipe
+    step_index: int = 0
+    timers: list[AgentTimer] = []
+    audio: Optional[str] = None  # base64 recording, for "speech"
+    audio_format: Optional[str] = None  # webm, mp4, ogg, wav or mp3
+    image: Optional[str] = None  # data URI of a camera frame, for "frame" (optional extra for "speech")
+    text: Optional[str] = None  # for "text"
+    timer_label: Optional[str] = None  # for "timer_done"
+    assistant_name: Optional[str] = None
+    style: Optional[str] = None
+    auto_advance: bool = True
+
+
+async def ask_omni_chat(messages: list[dict], purpose: str) -> tuple[str, dict]:
+    """Send messages to Omni; return its text reply and the token usage (for the app's usage meter)."""
+    key = os.getenv("OMNI_KEY")
+    if not key:
+        raise HTTPException(status_code=500, detail="OMNI_KEY is not configured on the server")
+    payload = {"model": MODEL, "messages": messages, "max_tokens": 400, "temperature": 0.2}
+    endpoint = f"{BASE_URL}/chat/completions"
+    audit = {"model": MODEL, "api_key": key, "endpoint": endpoint, "purpose": purpose,
+             "transport": "http", "audit_log": AUDIT_LOG}
+    started = time.monotonic()
+    try:
+        async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
+            response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json=payload)
+    except httpx.HTTPError as exc:
+        append_audit_record(**audit, ok=False, latency_s=time.monotonic() - started,
+                            error=f"{type(exc).__name__}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Omni request failed: {exc}")
+    elapsed = time.monotonic() - started
+    if response.status_code != 200:
+        append_audit_record(**audit, ok=False, status_code=response.status_code, latency_s=elapsed, error=response.text)
+        raise HTTPException(status_code=502, detail=f"Omni {response.status_code}: {response.text}")
+    body = response.json()
+    append_audit_record(**audit, ok=True, status_code=200, latency_s=elapsed, response_json=body)
+    try:
+        text = body["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        raise HTTPException(status_code=502, detail="Omni reply had no message")
+    used = normalize_usage(body)
+    return text, {"input": used.get("input_tokens"), "output": used.get("output_tokens"), "total": used.get("total_tokens")}
+
+
+@app.post("/api/agent/turn")
+async def agent_turn(request: AgentTurnRequest):
+    if request.event not in AGENT_EVENTS:
+        raise HTTPException(status_code=400, detail=f"event must be one of {sorted(AGENT_EVENTS)}")
+    steps = [clean_line(step, 600) for step in request.recipe.steps[:40]]
+    steps = [step for step in steps if step]
+    if not steps:
+        raise HTTPException(status_code=400, detail="recipe has no steps")
+    recipe = {
+        "title": clean_line(request.recipe.title, 120),
+        "servings": request.recipe.servings if isinstance(request.recipe.servings, int) and 0 < request.recipe.servings < 100 else None,
+        "ingredients": [line for line in (clean_line(i, 120) for i in request.recipe.ingredients[:60]) if line],
+        "steps": steps,
+    }
+    step_index = min(max(request.step_index, 0), len(steps) - 1)
+    timers = [{"label": clean_line(t.label, 40) or "timer", "seconds_left": min(max(t.seconds_left, 0), 3 * 3600)}
+              for t in request.timers[:10]]
+    session = agent_brain.get_session(clean_line(request.session_id, 64) or "default")
+    event = request.event
+
+    # a finished timer needs no model call
+    if event == "timer_done":
+        return {**agent_brain.timer_done_decision(request.timer_label or "timer", session), "usage": None, "step_index": step_index}
+
+    audio_b64, audio_format, image, text = "", "webm", "", ""
+    if event == "speech":
+        audio_b64 = (request.audio or "").split(",", 1)[-1]
+        if not audio_b64 or len(audio_b64) > MAX_AGENT_AUDIO_CHARS:
+            raise HTTPException(status_code=400, detail="speech needs a recording (base64 audio) of a sensible size")
+        audio_format = request.audio_format if request.audio_format in AGENT_AUDIO_FORMATS else "webm"
+    if event == "text":
+        text = clean_line(request.text, 300)
+        if not text:
+            raise HTTPException(status_code=400, detail="text is empty")
+    if event == "frame" and not request.image:
+        raise HTTPException(status_code=400, detail="frame needs an image")
+    if request.image:
+        problem = vision_data.image_problem(request.image)
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
+        image = request.image
+
+    if MOCK:
+        return {"heard": "", "seen": "", "step_done": None, "say": "[MOCK] Sounds good.", "actions": [], "note": "mock", "usage": None,
+                "step_index": step_index}
+
+    messages = agent_brain.build_messages(
+        event=event, recipe=recipe, step_index=step_index, timers=timers, session=session,
+        name=clean_line(request.assistant_name, 30), style=clean_line(request.style, 160),
+        text=text, audio_b64=audio_b64, audio_format=audio_format, image=image)
+    reply, used = await ask_omni_chat(messages, f"agent_{event}")
+    raw = agent_brain.parse_decision(reply)
+    if raw is None:
+        raise HTTPException(status_code=502, detail=f"Omni's reply was not in the expected shape: {reply[:200]!r}")
+    decision = agent_brain.decide(event=event, raw=raw, session=session, step_index=step_index,
+                                  n_steps=len(steps), timers=timers, auto_advance=request.auto_advance,
+                                  has_image=bool(image))
+    return {**decision, "usage": used, "step_index": step_index}
