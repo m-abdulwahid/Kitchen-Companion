@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCompanion } from "@/hooks/useCompanion";
 
 const links = [
   { href: "/", label: "Explore" },
@@ -12,20 +11,32 @@ const links = [
 
 export function AppNav() {
   const pathname = usePathname();
-  const { companion } = useCompanion();
 
   return (
     <header className="sticky top-0 z-20 border-b border-peach/80 bg-cream/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-tomato text-lg shadow-sm">
-            🍅
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-tomato text-cream shadow-sm">
+            <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
+              <path
+                d="M8 3v10.5a4 4 0 1 0 8 0V3"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+              <path
+                d="M8 7h8M8 11h8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
           </span>
           <div>
-            <p className="font-display text-xl text-espresso">Kitchen Companion</p>
-            <p className="text-xs text-caramel">
-              cook with {companion.name} · live · loud · a little messy
-            </p>
+            <p className="font-display text-xl text-espresso">Whisker</p>
+            <p className="text-xs text-caramel">cook with Remy · live · a little messy</p>
           </div>
         </Link>
         <nav className="flex gap-1 rounded-full bg-peach/70 p-1">

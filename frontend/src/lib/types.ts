@@ -1,12 +1,13 @@
 export type DietTag = "halal" | "vegetarian" | "vegan" | "gluten-free";
 
-export type RecipeSource = "kitchen" | "tiktok" | "instagram";
+export type RecipeSource = "kitchen" | "tiktok" | "instagram" | "youtube" | "web" | "api";
 
 export type Recipe = {
   id: string;
   title: string;
   description: string;
   emoji: string;
+  imageUrl?: string;
   timeMinutes: number;
   cost: string;
   servings: number;
@@ -14,6 +15,7 @@ export type Recipe = {
   ingredients: string[];
   steps: string[];
   source: RecipeSource;
+  videoUrl?: string;
 };
 
 export type VisionCheckResult = {

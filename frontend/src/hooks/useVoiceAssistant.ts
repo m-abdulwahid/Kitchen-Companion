@@ -32,10 +32,10 @@ function newSessionId(): string {
 }
 
 /**
- * Pip's voice, both directions, one audio player.
+ * Remy's voice, both directions, one audio player.
  * - toggle(step): tap-to-talk. First call starts recording, second sends it; the spoken
- *   reply plays automatically. Calling it while Pip is talking interrupts and records.
- * - speak(text, upcoming?): Pip reads text aloud (recipe steps, feedback). Ignored while the
+ *   reply plays automatically. Calling it while Remy is talking interrupts and records.
+ * - speak(text, upcoming?): Remy reads text aloud (recipe steps, feedback). Ignored while the
  *   user is asking a question; a newer speak() replaces an older one. If `upcoming` is given
  *   (the next step), its audio is fetched in the background once this one has arrived, so the
  *   voice service has it cached by the time the user moves on.
@@ -80,7 +80,7 @@ export function useVoiceAssistant({ onReply, onError, onSpoken, companion }: Opt
     window.speechSynthesis?.cancel();
   }, []);
 
-  /** Stop anything Pip is saying or about to say. */
+  /** Stop anything Remy is saying or about to say. */
   const interruptSpeech = useCallback(() => {
     speakAbortRef.current?.abort();
     speakAbortRef.current = null;
@@ -241,7 +241,7 @@ export function useVoiceAssistant({ onReply, onError, onSpoken, companion }: Opt
     maxTimerRef.current = window.setTimeout(stopRecording, MAX_RECORDING_MS);
   }, [changeState, interruptSpeech, releaseMic, send, stopRecording]);
 
-  /** Pass the current recipe step so Pip answers in context. */
+  /** Pass the current recipe step so Remy answers in context. */
   const toggle = useCallback(
     (currentStep: string) => {
       stepRef.current = currentStep;

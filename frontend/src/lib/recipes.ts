@@ -6,6 +6,8 @@ export const RECIPES: Recipe[] = [
     title: "Cozy Shakshuka",
     description: "Jammy tomatoes, runny eggs, and a lot of bread for dunking.",
     emoji: "🍳",
+    imageUrl:
+      "https://images.unsplash.com/photo-1590412200988-a436970781fa?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 30,
     cost: "$10–14",
     servings: 2,
@@ -36,6 +38,8 @@ export const RECIPES: Recipe[] = [
     title: "Gochujang Butter Noodles",
     description: "Spicy-sweet weeknight noodles that taste like a hug.",
     emoji: "🍜",
+    imageUrl:
+      "https://images.unsplash.com/photo-1557872943-16a5ac26437e?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 20,
     cost: "$8–12",
     servings: 2,
@@ -63,6 +67,8 @@ export const RECIPES: Recipe[] = [
     title: "Lemon Chickpea Orzo",
     description: "One-pot, bright, and very packed-lunch coded.",
     emoji: "🍋",
+    imageUrl:
+      "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 25,
     cost: "$7–11",
     servings: 3,
@@ -90,6 +96,8 @@ export const RECIPES: Recipe[] = [
     title: "Strawberry Shortcake Cups",
     description: "No-fuss dessert: jammy berries, cream, crumbly cake.",
     emoji: "🍓",
+    imageUrl:
+      "https://images.unsplash.com/photo-1464305795204-6f5bbfc7fb81?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 15,
     cost: "$9–13",
     servings: 4,
@@ -114,6 +122,8 @@ export const RECIPES: Recipe[] = [
     title: "Crispy Tofu Rice Bowl",
     description: "Crunchy edges, sticky rice, spicy-sweet drizzle.",
     emoji: "🍚",
+    imageUrl:
+      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 35,
     cost: "$11–15",
     servings: 2,
@@ -142,6 +152,8 @@ export const RECIPES: Recipe[] = [
     title: "Sheet-Pan Harissa Chicken",
     description: "Spicy, sticky, and almost zero dishes.",
     emoji: "🌶️",
+    imageUrl:
+      "https://images.unsplash.com/photo-1598103442097-8b74394b95c6?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 40,
     cost: "$14–18",
     servings: 3,
@@ -169,6 +181,8 @@ export const RECIPES: Recipe[] = [
     title: "Brown Butter Banana Toast",
     description: "Breakfast that feels like dessert, on purpose.",
     emoji: "🍌",
+    imageUrl:
+      "https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 10,
     cost: "$4–6",
     servings: 1,
@@ -186,6 +200,8 @@ export const RECIPES: Recipe[] = [
     title: "Miso Mushroom Udon",
     description: "Slurpable, savory, rainy-day energy.",
     emoji: "🍄",
+    imageUrl:
+      "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 28,
     cost: "$12–16",
     servings: 2,

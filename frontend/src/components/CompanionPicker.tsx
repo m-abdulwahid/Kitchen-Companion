@@ -9,7 +9,7 @@ import { speakText } from "@/lib/voice-api";
 
 type Phase = { id: string; step: "loading" | "playing" } | null;
 
-/** Pick who to cook with. Each card has a "Listen" button that plays that voice. */
+/** Small voice chips — Remy stays the chef; this only changes how he sounds. */
 export function CompanionPicker() {
   const { companion, setCompanion } = useCompanion();
   const { language } = useLanguage();
@@ -44,7 +44,7 @@ export function CompanionPicker() {
     abortRef.current = controller;
     try {
       const reply = await speakText(
-        `Hi, I'm ${candidate.name}. Let's cook something good!`,
+        `Hi, I'm Remy. Let's cook something good!`,
         candidate.voice,
         language.code,
         controller.signal,
@@ -61,73 +61,45 @@ export function CompanionPicker() {
     } catch {
       if (controller.signal.aborted) return;
       setPhase(null);
-      setError("Couldn't play that voice. Is the voice service running?");
+      setError("Couldn't play that voice.");
     }
   }
 
   return (
-    <fieldset className="mt-6">
-      <legend className="font-display text-xl text-espresso">
-        Who’s cooking with you?
-      </legend>
-      <div
-        role="radiogroup"
-        aria-label="Cooking companion"
-        className="mt-3 grid gap-2 sm:grid-cols-2"
-      >
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-1.5">
         {COMPANIONS.map((item) => {
           const selected = item.id === companion.id;
           const active = phase?.id === item.id;
           return (
-            <div
-              key={item.id}
-              className={`flex items-stretch overflow-hidden rounded-2xl border-2 ${
-                selected ? "border-tomato bg-white" : "border-peach bg-cream"
-              }`}
-            >
+            <div key={item.id} className="flex overflow-hidden rounded-full border border-peach">
               <button
                 type="button"
-                role="radio"
-                aria-checked={selected}
                 onClick={() => setCompanion(item.id)}
-                className="flex-1 px-3 py-2 text-left"
+                className={`px-2.5 py-0.5 text-xs font-semibold ${
+                  selected ? "bg-tomato text-cream" : "bg-cream text-cocoa hover:bg-peach"
+                }`}
               >
-                <span className="flex items-center gap-2 font-display text-lg text-espresso">
-                  {item.name}
-                  {selected ? (
-                    <span className="rounded-full bg-tomato px-2 py-0.5 text-xs font-semibold text-cream">
-                      cooking with
-                    </span>
-                  ) : null}
-                </span>
-                <span className="block text-sm leading-5 text-cocoa/80">
-                  {item.blurb}
-                </span>
+                {item.label}
               </button>
               <button
                 type="button"
                 onClick={() => listen(item)}
-                aria-label={`Listen to ${item.name}`}
-                className="w-24 shrink-0 border-l border-peach px-2 text-sm font-semibold text-caramel hover:bg-peach hover:text-tomato"
+                aria-label={`Preview ${item.label} voice`}
+                className="border-l border-peach bg-white px-1.5 text-[10px] font-semibold text-caramel hover:bg-peach"
               >
-                {active
-                  ? phase?.step === "loading"
-                    ? "Loading…"
-                    : "■ Stop"
-                  : "▶ Listen"}
+                {active ? (phase?.step === "loading" ? "…" : "■") : "▶"}
               </button>
             </div>
           );
         })}
-      </div>
-      <div className="mt-3">
-        <LanguagePicker />
+        <LanguagePicker compact />
       </div>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-raspberry">
+        <p role="alert" className="mt-1 text-xs text-raspberry">
           {error}
         </p>
       ) : null}
-    </fieldset>
+    </div>
   );
 }

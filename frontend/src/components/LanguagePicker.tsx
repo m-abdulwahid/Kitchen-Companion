@@ -3,9 +3,32 @@
 import { useLanguage } from "@/hooks/useLanguage";
 import { LANGUAGES } from "@/lib/languages";
 
-/** Choose the language the companion speaks. Text is translated by the voice service. */
-export function LanguagePicker() {
+type LanguagePickerProps = {
+  compact?: boolean;
+};
+
+/** Choose the language Remy speaks. */
+export function LanguagePicker({ compact = false }: LanguagePickerProps) {
   const { language, setLanguage } = useLanguage();
+
+  if (compact) {
+    return (
+      <label className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-caramel">
+        Lang
+        <select
+          value={language.code}
+          onChange={(event) => setLanguage(event.target.value)}
+          className="rounded-full border border-peach bg-white px-1.5 py-0.5 text-xs font-semibold normal-case text-cocoa"
+        >
+          {LANGUAGES.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
