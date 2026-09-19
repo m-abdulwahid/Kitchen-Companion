@@ -55,6 +55,14 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual([event["type"] for event in events], ["response.cancel", "input_audio_buffer.clear"])
         self.assertEqual(unchanged, self.context)
 
+    def test_proactive_message_requests_a_spoken_camera_update(self) -> None:
+        events, unchanged = client_control_to_upstream(
+            {"type": "proactive", "text": "The onions are starting to scorch."}, self.context,
+        )
+        self.assertEqual([event["type"] for event in events], ["conversation.item.create", "response.create"])
+        self.assertIn("Say exactly this", events[0]["item"]["content"][0]["text"])
+        self.assertEqual(unchanged, self.context)
+
     def test_handshake_relay_has_no_network_dependency(self) -> None:
         upstream = FakeUpstream([{"type": "session.created"}, {"type": "session.updated"}])
         events = asyncio.run(configure_upstream(upstream, self.context))

@@ -73,6 +73,14 @@ Response: `{ "seen": "Sliced onions in a pan.", "passed": false, "feedback": "St
 - Omni is told to answer JSON. If its reply is not in that shape you get HTTP 502 with the reply in `detail`, rather than a made-up verdict.
 - Tested only with drawn images and a fake camera so far, not real cooking footage. Omni tends to be too agreeable, so the prompt (`vision.py`) asks for a clear result before it answers `passed: true`. Expect to tune it.
 
+`POST /api/agent/turn` (JSON): the stateful cooking-agent endpoint used by
+hands-free camera coaching. A `frame` turn takes the current JPEG data URI,
+recipe, step index and companion details. It returns `seen`, `say`, `actions`
+and `step_done`. The server keeps a small per-session memory and requires two
+consecutive credible completed-step observations before it can auto-advance.
+The browser limits this endpoint to 12 changed frames per hands-free session,
+with at least five seconds between attempts.
+
 **Test page:** http://localhost:8000/vision. It shows your camera, sends a photo every 2 to 10 seconds, and lists what Omni saw and said with a timestamp (to line up with a recording). Pick an attached camera from the Camera list after pressing Start. It skips photos when the picture has not changed, stops itself after 200 photos, and only sends when it is running.
 
 Smoke test with the sample clip:

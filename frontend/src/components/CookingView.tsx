@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { Remy } from "@/components/Remy";
 import { useCompanion } from "@/hooks/useCompanion";
+import { useCookingAgent } from "@/hooks/useCookingAgent";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
+import type { CookingAgentDecision } from "@/lib/cooking-agent-api";
 import type { Recipe } from "@/lib/types";
 import { checkStepWithVision } from "@/lib/voice-api";
 
@@ -73,7 +75,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       language: language.code,
     },
   });
-  const { state: liveState, start: startLive, stop: stopLive } = useLiveSession({
+  const { state: liveState, start: startLive, stop: stopLive, speakProactively } = useLiveSession({
     recipeTitle: recipe.title,
     currentStep: step,
     companion: {
@@ -88,6 +90,37 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   });
   const handsFreeActive =
     liveState === "connecting" || liveState === "listening" || liveState === "speaking";
+  const applyCameraDecision = (decision: CookingAgentDecision) => {
+    if (decision.seen && !decision.say) setStatus(`Camera: ${decision.seen}`);
+    for (const action of decision.actions) {
+      if (action.type === "next_step") {
+        setStepIndex((current) => Math.min(current + 1, recipe.steps.length - 1));
+      } else if (action.type === "go_back") {
+        setStepIndex((current) => Math.max(0, current - 1));
+      } else if (action.type === "go_to_step") {
+        setStepIndex(Math.min(Math.max(action.step - 1, 0), recipe.steps.length - 1));
+      } else if (action.type === "finish") {
+        setStatus("Camera coach says this recipe is done — plate it cute.");
+        setRemyMood("cheer");
+      }
+    }
+    if (decision.say) {
+      setStatus(decision.say);
+      setRemyMood("talk");
+      // The agent already rate-limits alerts. Do not make an extra HTTP TTS
+      // request while the live companion is already answering the cook.
+      speakProactively(decision.say);
+    }
+  };
+  const { isWatching, framesSent, maxFrames } = useCookingAgent({
+    enabled: liveState === "listening" || liveState === "speaking",
+    videoRef,
+    recipe,
+    stepIndex,
+    companion: { name: companion.name, style: companion.style },
+    onDecision: applyCameraDecision,
+    onError: setStatus,
+  });
   const shownMood =
     liveState === "listening" || liveState === "connecting" || voiceState === "recording"
       ? "listen"
@@ -245,11 +278,11 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              disabled={checking}
+              disabled={checking || isWatching}
               onClick={captureAndCheck}
               className="rounded-2xl bg-raspberry py-2.5 text-sm font-semibold text-cream disabled:opacity-60"
             >
-              {checking ? "Looking…" : "Check step"}
+              {isWatching ? "Watching pan…" : checking ? "Looking…" : "Check step"}
             </button>
             <button
               type="button"
@@ -279,7 +312,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             {(liveState === "listening" || liveState === "speaking") && (
               <p className="col-span-2 text-center text-xs font-semibold text-caramel">
-                Hands-free is on. Speak naturally; Remy will stop when you start talking.
+                Hands-free is on. Remy watches changed frames ({framesSent}/{maxFrames}) and stops talking when you speak.
               </p>
             )}
           </div>

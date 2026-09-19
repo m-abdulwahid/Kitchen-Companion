@@ -224,6 +224,19 @@ def client_control_to_upstream(message: dict[str, Any], context: CookingContext)
             }},
             {"type": "response.create"},
         ], context
+    if message_type == "proactive":
+        text = clean_text(message.get("text"), MAX_TEXT_LENGTH)
+        if not text:
+            raise ValueError("proactive requires a non-empty text value")
+        return [
+            {"type": "conversation.item.create", "item": {
+                "type": "message", "role": "user", "content": [{
+                    "type": "input_text",
+                    "text": f"Camera coaching update. Say exactly this to the cook, with no additions: {text}",
+                }],
+            }},
+            {"type": "response.create"},
+        ], context
     raise ValueError(f"unsupported control message {message_type!r}")
 
 

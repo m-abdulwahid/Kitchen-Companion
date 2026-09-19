@@ -41,8 +41,9 @@ first JSON message:
 
 The server replies with `relay.ready`. Send raw binary PCM16 microphone chunks
 after that. Send `{"type":"step","current_step":"..."}` to refresh
-recipe context or `{"type":"interrupt"}` to cancel a spoken reply. Provider
-events, including `response.audio.delta`, are relayed to the browser unchanged.
+recipe context, `{"type":"interrupt"}` to cancel a spoken reply, or
+`{"type":"proactive","text":"..."}` to speak a camera-coach update.
+Provider events, including `response.audio.delta`, are relayed to the browser unchanged.
 
 ## Config
 

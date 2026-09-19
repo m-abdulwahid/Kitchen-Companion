@@ -180,6 +180,23 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
     sendControl({ type: "interrupt" });
   }, [flushPlayback, sendControl]);
 
+  /** Speak a validated camera-coach update only when the companion is free to respond. */
+  const speakProactively = useCallback((text: string): boolean => {
+    const message = text.trim().slice(0, 500);
+    const socket = socketRef.current;
+    if (
+      !message ||
+      !readyRef.current ||
+      stateRef.current !== "listening" ||
+      socket?.readyState !== WebSocket.OPEN
+    ) {
+      return false;
+    }
+    responseFinishedRef.current = false;
+    socket.send(JSON.stringify({ type: "proactive", text: message }));
+    return true;
+  }, []);
+
   const handleEvent = useCallback(
     (event: RealtimeEvent) => {
       switch (event.type) {
@@ -311,5 +328,5 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
 
   useEffect(() => stop, [stop]);
 
-  return { state, start, stop, interrupt, updateStep };
+  return { state, start, stop, interrupt, speakProactively, updateStep };
 }
