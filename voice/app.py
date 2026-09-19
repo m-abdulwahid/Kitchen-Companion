@@ -24,10 +24,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
-import agent as agent_brain
-import usage as usage_data
-import vision as vision_data
-from yibu_audit import append_audit_record, normalize_usage
+try:  # package import: `.venv/bin/uvicorn voice.app:app` from the repository root
+    from . import agent as agent_brain
+    from .backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
+    from . import usage as usage_data
+    from . import vision as vision_data
+    from .yibu_audit import append_audit_record, normalize_usage
+except ImportError:  # script import: `cd voice && ../.venv/bin/uvicorn app:app`
+    import agent as agent_brain
+    from backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
+    import usage as usage_data
+    import vision as vision_data
+    from yibu_audit import append_audit_record, normalize_usage
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,6 +59,7 @@ BASE_URL = os.getenv("OMNI_BASE_URL", "https://yibuapi.com/v1").rstrip("/")
 MODEL = os.getenv("OMNI_MODEL", "qwen3.5-omni-flash")
 VOICE = os.getenv("OMNI_VOICE", "Tina")
 MOCK = os.getenv("VOICE_MOCK", "").lower() in {"1", "true", "yes"}
+BACKBOARD_MEMORY = BackboardMemory()
 AUDIT_LOG = ROOT / "artifacts" / "yibu_api_calls.jsonl"
 AUDIT_PURPOSE = "voice_audio_understanding"
 SPEAK_AUDIT_PURPOSE = "voice_text_to_speech"
@@ -596,6 +605,7 @@ class AgentTimer(BaseModel):
 
 class AgentTurnRequest(BaseModel):
     session_id: str
+    memory_profile_id: Optional[str] = None  # stable browser-local id; never an email or display name
     event: str  # speech | frame | text | timer_done
     recipe: AgentRecipe
     step_index: int = 0
@@ -608,6 +618,12 @@ class AgentTurnRequest(BaseModel):
     assistant_name: Optional[str] = None
     style: Optional[str] = None
     auto_advance: bool = True
+
+
+class MemoryRequest(BaseModel):
+    profile_id: str
+    fact: str
+    action: str = "remember"  # remember | forget
 
 
 async def ask_omni_chat(messages: list[dict], purpose: str) -> tuple[str, dict]:
@@ -641,6 +657,29 @@ async def ask_omni_chat(messages: list[dict], purpose: str) -> tuple[str, dict]:
     return text, {"input": used.get("input_tokens"), "output": used.get("output_tokens"), "total": used.get("total_tokens")}
 
 
+@app.post("/api/memory")
+async def update_memory(request: MemoryRequest):
+    """Save/remove an explicitly chosen cooking preference without an Omni call."""
+    if not BACKBOARD_MEMORY.enabled:
+        raise HTTPException(status_code=503, detail="Backboard memory is not configured. Add BACKBOARD_API_KEY to .env and restart the voice service.")
+    profile_id = valid_profile_id(request.profile_id)
+    fact = clean_line(request.fact, 240)
+    if not profile_id:
+        raise HTTPException(status_code=400, detail="memory profile is invalid")
+    if len(fact) < 3:
+        raise HTTPException(status_code=400, detail="memory needs at least three characters")
+    if request.action not in {"remember", "forget"}:
+        raise HTTPException(status_code=400, detail="action must be remember or forget")
+    try:
+        if request.action == "remember":
+            changed = await BACKBOARD_MEMORY.remember(profile_id, fact)
+        else:
+            changed = await BACKBOARD_MEMORY.forget(profile_id, fact)
+    except (httpx.HTTPError, RuntimeError, ValueError):
+        raise HTTPException(status_code=502, detail="Backboard memory is temporarily unavailable")
+    return {"ok": True, "action": request.action, "changed": changed}
+
+
 @app.post("/api/agent/turn")
 async def agent_turn(request: AgentTurnRequest):
     if request.event not in AGENT_EVENTS:
@@ -660,10 +699,13 @@ async def agent_turn(request: AgentTurnRequest):
               for t in request.timers[:10]]
     session = agent_brain.get_session(clean_line(request.session_id, 64) or "default")
     event = request.event
+    memory_profile_id = valid_profile_id(request.memory_profile_id)
+    memory_status = {"enabled": BACKBOARD_MEMORY.enabled, "used": 0, "saved": False, "forgot": False}
 
     # a finished timer needs no model call
     if event == "timer_done":
-        return {**agent_brain.timer_done_decision(request.timer_label or "timer", session), "usage": None, "step_index": step_index}
+        return {**agent_brain.timer_done_decision(request.timer_label or "timer", session), "usage": None,
+                "step_index": step_index, "memory": memory_status}
 
     audio_b64, audio_format, image, text = "", "webm", "", ""
     if event == "speech":
@@ -683,14 +725,25 @@ async def agent_turn(request: AgentTurnRequest):
             raise HTTPException(status_code=400, detail=problem)
         image = request.image
 
+    stored_memories: list[str] = []
+    if memory_profile_id and not MOCK:
+        recall_query = " ".join([recipe["title"], steps[step_index], text or "cooking preferences and substitutions"])
+        try:
+            stored_memories = await BACKBOARD_MEMORY.recall(memory_profile_id, recall_query)
+            memory_status["used"] = len(stored_memories)
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            # Durable memory should improve the cook's experience, never block it.
+            pass
+
     if MOCK:
         return {"heard": "", "seen": "", "step_done": None, "say": "[MOCK] Sounds good.", "actions": [], "note": "mock", "usage": None,
-                "step_index": step_index}
+                "step_index": step_index, "memory": memory_status}
 
     messages = agent_brain.build_messages(
         event=event, recipe=recipe, step_index=step_index, timers=timers, session=session,
         name=clean_line(request.assistant_name, 30), style=clean_line(request.style, 160),
-        text=text, audio_b64=audio_b64, audio_format=audio_format, image=image)
+        text=text, audio_b64=audio_b64, audio_format=audio_format, image=image,
+        memory=memory_context(stored_memories))
     reply, used = await ask_omni_chat(messages, f"agent_{event}")
     raw = agent_brain.parse_decision(reply)
     if raw is None:
@@ -698,4 +751,13 @@ async def agent_turn(request: AgentTurnRequest):
     decision = agent_brain.decide(event=event, raw=raw, session=session, step_index=step_index,
                                   n_steps=len(steps), timers=timers, auto_advance=request.auto_advance,
                                   has_image=bool(image))
-    return {**decision, "usage": used, "step_index": step_index}
+    command = extract_memory_command(decision["heard"])
+    if memory_profile_id and command:
+        try:
+            if command.action == "remember":
+                memory_status["saved"] = await BACKBOARD_MEMORY.remember(memory_profile_id, command.fact)
+            else:
+                memory_status["forgot"] = await BACKBOARD_MEMORY.forget(memory_profile_id, command.fact)
+        except (httpx.HTTPError, RuntimeError, ValueError):
+            pass
+    return {**decision, "usage": used, "step_index": step_index, "memory": memory_status}

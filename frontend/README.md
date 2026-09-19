@@ -45,6 +45,13 @@ interrupt a reply. The camera coach sends a compressed JPEG only when the view
 changes, at most once every five seconds and 12 times per hands-free session;
 turn hands-free off to stop it immediately.
 
+## Durable Backboard memory
+
+Add `BACKBOARD_API_KEY` to the root `.env` and restart the service on port
+8000. In the cooking view, **Remy's kitchen memory** lets the cook explicitly
+save or forget a preference. It is isolated to that browser and recalled for
+relevant camera-agent turns. See [the memory guide](../docs/backboard-memory.md).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

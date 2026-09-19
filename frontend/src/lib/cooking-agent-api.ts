@@ -32,6 +32,7 @@ export async function checkCookingFrame(
   recipe: Recipe,
   stepIndex: number,
   companion: Pick<Speaker, "name" | "style">,
+  memoryProfileId: string,
   signal?: AbortSignal,
 ): Promise<CookingAgentDecision> {
   const response = await fetch(`${VOICE_API_URL}/api/agent/turn`, {
@@ -40,6 +41,7 @@ export async function checkCookingFrame(
     signal,
     body: JSON.stringify({
       session_id: sessionId,
+      memory_profile_id: memoryProfileId,
       event: "frame",
       recipe: {
         title: recipe.title,

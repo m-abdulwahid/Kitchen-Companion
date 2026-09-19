@@ -78,8 +78,9 @@ SYSTEM_PROMPT = (
     "Only take an action when the cook asked for it or the situation clearly calls for it. Never act on a guess. "
     "What you say and what the screen shows must match: if you tell the cook to move on to another step, or what "
     "the next step is, take the matching action in the same reply, so the screen is on the step you are talking about.\n\n"
-    "Remember what the cook tells you (allergies, what they have or lack, preferences) and use it in later answers: "
-    "if a suggestion would break something they told you, say so.\n\n"
+    "Use the long-term cook preferences only when they are relevant. The cook's facts are saved only when they explicitly "
+    "say \"remember ...\"; do not claim to remember or save an inferred fact. If a suggestion would break a saved "
+    "preference, say so.\n\n"
     "Ground everything in the recipe below. For quantities and ingredients use only what is listed; if something is "
     "not listed, say you do not know instead of inventing an amount. For substitutions or technique, give brief, "
     "practical advice. If you cannot see or hear well enough, say so honestly.\n\n"
@@ -117,6 +118,7 @@ def build_messages(
     audio_b64: str = "",
     audio_format: str = "webm",
     image: str = "",
+    memory: str = "",
 ) -> list[dict]:
     steps = recipe.get("steps", [])
     lines = [f"Recipe: {recipe.get('title', 'unknown')}" + (f" (serves {recipe['servings']})" if recipe.get("servings") else "")]
@@ -131,6 +133,8 @@ def build_messages(
         lines.append("You already said (do not repeat): " + " / ".join(session.said))
     if session.last_seen:
         lines.append("An earlier photo showed (may be out of date, judge only the new photo): " + session.last_seen)
+    if memory:
+        lines.append(memory)
 
     system = SYSTEM_PROMPT
     if name:

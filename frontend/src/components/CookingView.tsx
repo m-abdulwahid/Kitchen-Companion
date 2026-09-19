@@ -10,6 +10,8 @@ import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import type { CookingAgentDecision } from "@/lib/cooking-agent-api";
+import { cookingMemoryProfileId } from "@/lib/cooking-profile";
+import { saveCookingMemory } from "@/lib/memory-api";
 import type { Recipe } from "@/lib/types";
 import { checkStepWithVision } from "@/lib/voice-api";
 
@@ -46,6 +48,9 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [checking, setChecking] = useState(false);
   const [cameraProblem, setCameraProblem] = useState("");
   const [cameraTry, setCameraTry] = useState(0);
+  const [memoryDraft, setMemoryDraft] = useState("");
+  const [memoryStatus, setMemoryStatus] = useState("");
+  const [savingMemory, setSavingMemory] = useState(false);
   const [moodState, setMoodState] = useState<{ mood: RemyMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
   );
@@ -204,6 +209,22 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     setStepIndex((value) => Math.max(0, value - 1));
   }
 
+  async function updateCookingMemory(action: "remember" | "forget") {
+    const fact = memoryDraft.trim();
+    if (fact.length < 3) return;
+    setSavingMemory(true);
+    setMemoryStatus("");
+    try {
+      await saveCookingMemory(cookingMemoryProfileId(), fact, action);
+      setMemoryStatus(action === "remember" ? "Saved for future cooks on this browser." : "Removed when a matching memory was found.");
+      setMemoryDraft("");
+    } catch (error) {
+      setMemoryStatus(error instanceof Error ? error.message : "Memory could not be updated.");
+    } finally {
+      setSavingMemory(false);
+    }
+  }
+
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,0.7fr)]">
       <div className="overflow-hidden rounded-[2rem] bg-espresso shadow-[0_16px_40px_rgba(61,36,24,0.25)]">
@@ -318,6 +339,38 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
           </div>
         </div>
         <Remy size="sm" mood={shownMood} message={status} />
+        <div className="rounded-[2rem] bg-white p-4 shadow-[0_12px_32px_rgba(107,63,42,0.1)]">
+          <p className="font-display text-lg text-espresso">Remy&apos;s kitchen memory</p>
+          <p className="mt-1 text-xs leading-5 text-cocoa">
+            Save only a preference you want this browser to remember, like “no peanuts” or “likes extra spice”.
+          </p>
+          <input
+            value={memoryDraft}
+            onChange={(event) => setMemoryDraft(event.target.value)}
+            maxLength={240}
+            placeholder="A cooking preference…"
+            className="mt-3 w-full rounded-xl border border-peach bg-cream px-3 py-2 text-sm text-espresso outline-none placeholder:text-caramel focus:border-tomato"
+          />
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={savingMemory || memoryDraft.trim().length < 3}
+              onClick={() => void updateCookingMemory("remember")}
+              className="rounded-xl bg-espresso py-2 text-sm font-semibold text-cream disabled:opacity-60"
+            >
+              {savingMemory ? "Saving…" : "Remember"}
+            </button>
+            <button
+              type="button"
+              disabled={savingMemory || memoryDraft.trim().length < 3}
+              onClick={() => void updateCookingMemory("forget")}
+              className="rounded-xl bg-peach py-2 text-sm font-semibold text-cocoa disabled:opacity-60"
+            >
+              Forget
+            </button>
+          </div>
+          {memoryStatus ? <p className="mt-2 text-xs font-medium text-caramel">{memoryStatus}</p> : null}
+        </div>
       </div>
     </section>
   );

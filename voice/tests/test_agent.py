@@ -236,7 +236,7 @@ class MessageTests(unittest.TestCase):
         self.assertIn("must be null", system)
         self.assertIn("never copy them", system)
         self.assertIn("take the matching action", system)
-        self.assertIn("Remember what the cook tells you", system)
+        self.assertIn("explicitly say \"remember ...\"", system)
 
     def test_name_style_and_memory_are_used(self):
         s = agent.Session()
@@ -247,6 +247,11 @@ class MessageTests(unittest.TestCase):
         self.assertIn("Warm and precise.", system)
         self.assertIn("Cook: how long?", system)
         self.assertIn("do not repeat): About ten minutes.", system)
+
+    def test_backboard_memory_context_is_added_without_changing_recipe_state(self):
+        system = self.build(memory="Long-term cook preferences from Backboard (use only when relevant): Avoid peanuts.")[0]["content"]
+        self.assertIn("Backboard", system)
+        self.assertIn("Avoid peanuts.", system)
 
 
 class MiscTests(unittest.TestCase):

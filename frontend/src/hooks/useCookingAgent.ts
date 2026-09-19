@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
+import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 import type { Speaker } from "@/lib/voice-api";
 
@@ -64,6 +65,7 @@ export function useCookingAgent(options: Options) {
   const intervalRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const sessionIdRef = useRef("");
+  const memoryProfileIdRef = useRef("");
   const lastThumbnailRef = useRef<Uint8Array | null>(null);
   const sentRef = useRef(0);
   const busyRef = useRef(false);
@@ -107,8 +109,10 @@ export function useCookingAgent(options: Options) {
     abortRef.current = controller;
     try {
       sessionIdRef.current ||= newSessionId();
+      memoryProfileIdRef.current ||= cookingMemoryProfileId();
       const decision = await checkCookingFrame(
-        frame.image, sessionIdRef.current, current.recipe, current.stepIndex, current.companion, controller.signal,
+        frame.image, sessionIdRef.current, current.recipe, current.stepIndex, current.companion,
+        memoryProfileIdRef.current, controller.signal,
       );
       if (controller.signal.aborted) return;
       lastThumbnailRef.current = frame.thumbnail;
