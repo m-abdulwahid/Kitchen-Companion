@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sous-chef voice test</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      background: #111;
+      color: #eee;
+    }
+    #talk {
+      width: 100%;
+      height: 140px;
+      font-size: 1.4rem;
+      border-radius: 16px;
+      border: none;
+      background: #2a6df0;
+      color: white;
+      touch-action: none;
+      user-select: none;
+    }
+    #talk.recording {
+      background: #d63b3b;
+    }
+    #status {
+      text-align: center;
+      margin: 8px 0 16px;
+      color: #aaa;
+      min-height: 1.2em;
+    }
+    #transcript {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .entry {
+      background: #1c1c1c;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .entry .who {
+      font-size: 0.75rem;
+      color: #888;
+      text-transform: uppercase;
+    }
+    .entry.error {
+      background: #401b1b;
+      color: #ffb4b4;
+    }
+    #log {
+      margin-top: 24px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+    #log div {
+      border-top: 1px solid #222;
+      padding: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Sous-chef voice test</h2>
+  <button id="talk">Hold to talk</button>
+  <div id="status">tap the button once to enable audio, then hold to record</div>
+  <div id="transcript"></div>
+  <div id="log"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
