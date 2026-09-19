@@ -16,7 +16,7 @@ const fredoka = Fredoka({
 export const metadata: Metadata = {
   title: "Kitchen Companion",
   description:
-    "Live cooking with camera, voice, and a tiny sous-chef named Pip.",
+    "Live cooking with camera, voice, and a sous-chef you pick.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

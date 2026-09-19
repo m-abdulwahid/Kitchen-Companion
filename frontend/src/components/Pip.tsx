@@ -1,4 +1,6 @@
-import { ASSISTANT } from "@/lib/assistant";
+"use client";
+
+import { useCompanion } from "@/hooks/useCompanion";
 
 type PipProps = {
   mood?: "idle" | "talk" | "listen" | "cheer";
@@ -6,6 +8,7 @@ type PipProps = {
 };
 
 export function Pip({ mood = "idle", message }: PipProps) {
+  const { companion } = useCompanion();
   const bounce =
     mood === "talk" || mood === "cheer" ? "animate-bounce" : "animate-pip";
 
@@ -52,7 +55,7 @@ export function Pip({ mood = "idle", message }: PipProps) {
       </div>
       {message ? (
         <div className="relative max-w-sm rounded-3xl rounded-bl-md bg-white px-4 py-3 text-sm leading-6 text-cocoa shadow-[0_8px_24px_rgba(107,63,42,0.12)]">
-          <p className="font-display text-raspberry">{ASSISTANT.name}</p>
+          <p className="font-display text-raspberry">{companion.name}</p>
           <p>{message}</p>
         </div>
       ) : null}

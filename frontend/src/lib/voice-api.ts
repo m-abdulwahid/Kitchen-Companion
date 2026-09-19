@@ -34,17 +34,25 @@ async function readReply(response: Response): Promise<VoiceReply> {
   };
 }
 
-/** Send a recorded question; get back Pip's answer as text and speech. */
+/** Who answers, and in what language: the chosen companion (voice, name, personality) and language code. */
+export type Speaker = { voice: string; name: string; style: string; language: string };
+
+/** Send a recorded question; get back the companion's answer as text and speech. */
 export async function askVoice(
   recording: Blob,
   sessionId: string,
   currentStep: string,
+  who: Speaker,
   signal?: AbortSignal,
 ): Promise<VoiceReply> {
   const form = new FormData();
   form.append("audio", recording, `clip.${extensionFor(recording.type)}`);
   form.append("session_id", sessionId);
   form.append("current_step", currentStep);
+  form.append("voice", who.voice);
+  form.append("assistant_name", who.name);
+  form.append("style", who.style);
+  form.append("language", who.language);
 
   const response = await fetch(`${VOICE_API_URL}/api/voice`, {
     method: "POST",
@@ -54,15 +62,20 @@ export async function askVoice(
   return readReply(response);
 }
 
-/** Have Pip read text aloud in the Omni voice (recipe steps, feedback). */
+/**
+ * Read text aloud in an Omni voice (recipe steps, feedback). Omit `voice` for the service's default.
+ * With a `language` other than English the service translates first, and `text` in the reply is the translation.
+ */
 export async function speakText(
   text: string,
+  voice?: string,
+  language?: string,
   signal?: AbortSignal,
 ): Promise<VoiceReply> {
   const response = await fetch(`${VOICE_API_URL}/api/speak`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, voice, language }),
     signal,
   });
   return readReply(response);

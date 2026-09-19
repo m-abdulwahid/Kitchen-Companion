@@ -9,6 +9,7 @@ import base64
 import io
 import json
 import os
+import re
 import time
 import wave
 from collections import OrderedDict
@@ -18,6 +19,7 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from yibu_audit import append_audit_record
@@ -60,6 +62,36 @@ SPEAK_PROMPT = (
 )
 MAX_SPEAK_CHARS = 600
 SPEAK_CACHE_SIZE = 200
+
+# Languages the app offers. The voices support 29 (see voices.json); to add one, add a line here
+# and in frontend/src/lib/languages.ts. English is the source language: no translation step.
+LANGUAGES = {"en": "English", "fr": "French", "es": "Spanish"}
+TRANSLATE_PROMPT = (
+    "You are a translator and text-to-speech engine for cooking instructions. Translate the user's message "
+    "into {language} the way a cook would say it (for example, \"crack in the eggs\" means to add eggs by "
+    "cracking them into the pan, not to make cracks in them). Translate every part, including labels such as "
+    "\"Step 2\" and numbers, and leave nothing out. Then read your translation aloud in {language}, in a natural, "
+    "native-sounding way. Say only the translation: no notes, no original text, nothing else."
+)
+
+# Voice library: catalog from Alibaba's official list (voices.json) plus what we verified against
+# our API (voices_checked.json, made by scripts/verify_voices.py). See /voices.
+VOICES_FILE = Path(__file__).resolve().parent / "voices.json"
+VOICES_CHECKED_FILE = Path(__file__).resolve().parent / "voices_checked.json"
+VOICES_PAGE = Path(__file__).resolve().parent / "static" / "voices.html"
+
+
+def load_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+CATALOG = load_json(VOICES_FILE)
+VOICE_NAMES = {voice["name"] for voice in CATALOG.get("voices", [])}
+if VOICE_NAMES and VOICE not in VOICE_NAMES:
+    print(f"WARNING: OMNI_VOICE={VOICE!r} is not in voices.json; Omni may reject it. See /voices.")
 
 # Omni streams raw PCM with no header. The rate is not stated by the API; 24 kHz / 16-bit / mono
 # is inferred from speech pace (docs/omni-voice.md). Change here if voices sound too fast or slow.
@@ -149,13 +181,17 @@ class OmniStream:
 
 class SpeakRequest(BaseModel):
     text: str
+    # Optional: preview any catalog voice without changing OMNI_VOICE (used by /voices).
+    voice: Optional[str] = None
+    # Optional language code (see LANGUAGES). The text is translated, then spoken in that language.
+    language: Optional[str] = None
 
 
 # (voice, text) -> reply. Steps are re-read often (repeat, back, next), so don't pay Omni twice.
-speak_cache: OrderedDict[tuple[str, str], dict] = OrderedDict()
+speak_cache: OrderedDict[tuple[str, str, str], dict] = OrderedDict()
 
 
-async def ask_omni(messages: list[dict], purpose: str) -> dict:
+async def ask_omni(messages: list[dict], purpose: str, voice: Optional[str] = None) -> dict:
     """Send messages to Omni asking for text + speech; return {"text", "audio", "audio_mime"}."""
     key = os.getenv("OMNI_KEY")
     if not key:
@@ -166,7 +202,7 @@ async def ask_omni(messages: list[dict], purpose: str) -> dict:
         "model": MODEL,
         "messages": messages,
         "modalities": ["text", "audio"],
-        "audio": {"voice": VOICE, "format": "wav"},
+        "audio": {"voice": voice or VOICE, "format": "wav"},
         "stream": True,
         "stream_options": {"include_usage": True},
         "max_tokens": 512,
@@ -217,12 +253,40 @@ async def ask_omni(messages: list[dict], purpose: str) -> dict:
     }
 
 
+def clean_line(value: Optional[str], limit: int) -> str:
+    """One short line of plain text: no control characters or line breaks, at most `limit` characters."""
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", value or "").strip()[:limit].strip()
+
+
+def build_system_prompt(name: str, style: str, current_step: Optional[str], language: str = "en") -> str:
+    prompt = SYSTEM_PROMPT
+    if language != "en":
+        prompt += f" Always answer in {LANGUAGES[language]}, whatever language the user speaks."
+    if name:
+        prompt = prompt.replace("You are a sous-chef", f"You are {name}, a sous-chef", 1)
+    if style:
+        prompt += f" Your personality: {style}"
+    if current_step:
+        prompt += f" The user is currently on this cooking step: {current_step}"
+    return prompt
+
+
 @app.post("/api/voice")
 async def voice(
     audio: UploadFile = File(...),
     session_id: str = Form(...),
     current_step: Optional[str] = Form(None),
+    # Optional: who is answering. The frontend sends the chosen cooking companion (see /voices).
+    voice: Optional[str] = Form(None),
+    assistant_name: Optional[str] = Form(None),
+    style: Optional[str] = Form(None),
+    language: Optional[str] = Form(None),
 ):
+    if voice and VOICE_NAMES and voice not in VOICE_NAMES:
+        raise HTTPException(status_code=400, detail=f"unknown voice {voice!r}; see /api/voices")
+    language = language or "en"
+    if language not in LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"unknown language {language!r}; use one of {sorted(LANGUAGES)}")
     audio_bytes = await audio.read()
 
     if MOCK:
@@ -235,9 +299,7 @@ async def voice(
     mime, fmt = guess_audio_kind(audio.filename or "", audio.content_type)
     data_uri = f"data:{mime};base64,{base64.b64encode(audio_bytes).decode('ascii')}"
 
-    system = SYSTEM_PROMPT
-    if current_step:
-        system += f" The user is currently on this cooking step: {current_step}"
+    system = build_system_prompt(clean_line(assistant_name, 30), clean_line(style, 160), current_step, language)
     messages = [{"role": "system", "content": system}]
     messages.append({
         "role": "user",
@@ -245,7 +307,7 @@ async def voice(
             {"type": "input_audio", "input_audio": {"data": data_uri, "format": fmt}},
         ],
     })
-    return await ask_omni(messages, AUDIT_PURPOSE)
+    return await ask_omni(messages, AUDIT_PURPOSE, voice)
 
 
 @app.post("/api/speak")
@@ -260,18 +322,58 @@ async def speak(request: SpeakRequest):
     if MOCK:
         return {"text": text, "audio": None, "audio_mime": None}
 
-    cache_key = (VOICE, text)
+    voice = request.voice or VOICE
+    if request.voice and VOICE_NAMES and request.voice not in VOICE_NAMES:
+        raise HTTPException(status_code=400, detail=f"unknown voice {request.voice!r}; see /api/voices")
+
+    language = request.language or "en"
+    if language not in LANGUAGES:
+        raise HTTPException(status_code=400, detail=f"unknown language {language!r}; use one of {sorted(LANGUAGES)}")
+
+    cache_key = (voice, language, text)
     if cache_key in speak_cache:
         speak_cache.move_to_end(cache_key)
         return speak_cache[cache_key]
 
+    prompt = SPEAK_PROMPT if language == "en" else TRANSLATE_PROMPT.format(language=LANGUAGES[language])
     messages = [
-        {"role": "system", "content": SPEAK_PROMPT},
+        {"role": "system", "content": prompt},
         {"role": "user", "content": text},
     ]
-    reply = await ask_omni(messages, SPEAK_AUDIT_PURPOSE)
+    reply = await ask_omni(messages, SPEAK_AUDIT_PURPOSE, voice)
     if reply["audio"]:  # never cache a text-only failure
         speak_cache[cache_key] = reply
         while len(speak_cache) > SPEAK_CACHE_SIZE:
             speak_cache.popitem(last=False)
     return reply
+
+
+@app.get("/api/voices")
+def voices():
+    """The voice library: catalog, which voice is in use, and what we verified."""
+    checked = load_json(VOICES_CHECKED_FILE)
+    results = checked.get("results", {})
+    return {
+        "provider": CATALOG.get("provider"),
+        "source_url": CATALOG.get("source_url"),
+        "model_family": CATALOG.get("model_family"),
+        "languages_note": CATALOG.get("languages_note"),
+        "other_model_families": CATALOG.get("other_model_families"),
+        "model": MODEL,
+        "active_voice": VOICE,
+        "default_voice": CATALOG.get("default_voice"),
+        "checked_at": checked.get("checked_at"),
+        "checked_model": checked.get("model"),
+        "max_text_chars": MAX_SPEAK_CHARS,
+        "languages": [{"code": code, "name": name} for code, name in LANGUAGES.items()],
+        "voices": [
+            {**voice, "works": (results.get(voice["name"]) or {}).get("ok")}
+            for voice in CATALOG.get("voices", [])
+        ],
+    }
+
+
+@app.get("/voices", include_in_schema=False)
+def voices_page():
+    """Voice library page: browse and preview voices."""
+    return FileResponse(VOICES_PAGE)

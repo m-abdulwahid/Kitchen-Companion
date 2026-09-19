@@ -10,11 +10,12 @@ export async function checkStepWithVision(
   _imageDataUrl: string,
   stepText: string,
   stepIndex: number,
+  assistantName: string = ASSISTANT.name,
 ): Promise<VisionCheckResult> {
   await wait(1200);
   return {
     passed: true,
-    feedback: `${ASSISTANT.name} peeked at the camera — step ${stepIndex + 1} looks on track. ${stepText.slice(0, 48)}… keep going, chef.`,
+    feedback: `${assistantName} peeked at the camera — step ${stepIndex + 1} looks on track. ${stepText.slice(0, 48)}… keep going, chef.`,
   };
 }
 

@@ -12,7 +12,7 @@ Kitchen-Companion/
 │   └── samples/      test audio
 ├── backend/      Backend service (TBD)
 ├── vision/       Camera "check my step" service (TBD)
-├── docs/         Notes and write-ups
+├── docs/         Notes and write-ups (start with docs/status.md: what is real vs placeholder)
 ├── scripts/      One-off helper scripts
 ├── examples/     Vendor API examples (read-only reference)
 ├── artifacts/    API call audit log (written by the services)
@@ -36,6 +36,8 @@ Kitchen-Companion/
 | --- | --- |
 | Frontend | `cd frontend && npm install && npm run dev` |
 | Voice | see [voice/README.md](voice/README.md) |
+
+With the voice service running, browse and hear all of Pip's possible voices at http://localhost:8000/voices.
 
 "Ask Pip" needs the voice service running on port 8000; how it all connects: [docs/voice-integration.md](docs/voice-integration.md).
 

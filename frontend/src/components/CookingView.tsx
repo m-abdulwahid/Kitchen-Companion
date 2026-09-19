@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pip } from "@/components/Pip";
+import { LanguagePicker } from "@/components/LanguagePicker";
+import { useCompanion } from "@/hooks/useCompanion";
+import { useLanguage } from "@/hooks/useLanguage";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
-import { ASSISTANT } from "@/lib/assistant";
 import { checkStepWithVision } from "@/lib/mocks";
 import type { Recipe } from "@/lib/types";
 
@@ -12,12 +14,14 @@ type CookingViewProps = {
   onExit: () => void;
 };
 
-const ASK_LABELS: Record<VoiceState, string> = {
-  idle: `Ask ${ASSISTANT.name}`,
-  recording: "Listening… tap to send",
-  thinking: `${ASSISTANT.name} is thinking…`,
-  speaking: `${ASSISTANT.name} is talking — tap to interrupt`,
-};
+function askLabels(name: string): Record<VoiceState, string> {
+  return {
+    idle: `Ask ${name}`,
+    recording: "Listening… tap to send",
+    thinking: `${name} is thinking…`,
+    speaking: `${name} is talking — tap to interrupt`,
+  };
+}
 
 type PipMood = "idle" | "talk" | "listen" | "cheer";
 
@@ -32,12 +36,25 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   );
   const pipMood = moodState.stepIndex === stepIndex ? moodState.mood : "idle";
   const setPipMood = (mood: PipMood) => setMoodState({ mood, stepIndex });
-  // All of Pip's talking, and the user's questions, go through the voice service (Omni).
+  // The companion picked on the recipe page: their voice, name and personality.
+  const { companion } = useCompanion();
+  const { language } = useLanguage();
+  // All of the companion's talking, and the user's questions, go through the voice service (Omni).
   const {
     state: voiceState,
     toggle: toggleVoice,
     speak,
-  } = useVoiceAssistant({ onReply: setStatus, onError: setStatus });
+  } = useVoiceAssistant({
+    onReply: setStatus,
+    onError: setStatus,
+    onSpoken: setStatus,
+    companion: {
+      voice: companion.voice,
+      name: companion.name,
+      style: companion.style,
+      language: language.code,
+    },
+  });
   const shownMood =
     voiceState === "recording"
       ? "listen"
@@ -72,7 +89,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
         setStatus("Live camera on. Let’s cook.");
       })
       .catch(() => {
-        setStatus("Camera blocked — allow the webcam to let Pip watch the pan.");
+        setStatus("Camera blocked — allow the webcam so your chef can watch the pan.");
       });
 
     return () => {
@@ -82,9 +99,10 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   }, []);
 
   // Pip's "talk" mood while speaking comes from the voice state (shownMood above).
+  // Also re-reads the step when the language changes, so switching language is heard at once.
   useEffect(() => {
     speak(stepSpeech, upcomingSpeech);
-  }, [stepSpeech, upcomingSpeech, speak]);
+  }, [stepSpeech, upcomingSpeech, speak, language.code]);
 
   async function captureAndCheck() {
     const video = videoRef.current;
@@ -96,7 +114,12 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     canvas.height = video.videoHeight || 480;
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const result = await checkStepWithVision(imageDataUrl, step, stepIndex);
+    const result = await checkStepWithVision(
+      imageDataUrl,
+      step,
+      stepIndex,
+      companion.name,
+    );
     setStatus(result.feedback);
     speak(result.feedback);
     setChecking(false);
@@ -172,7 +195,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
               onClick={captureAndCheck}
               className="rounded-2xl bg-raspberry py-3 font-semibold text-cream disabled:opacity-60"
             >
-              {checking ? "Pip is looking…" : "Check my step"}
+              {checking ? `${companion.name} is looking…` : "Check my step"}
             </button>
             <button
               type="button"
@@ -180,8 +203,11 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
               onClick={() => toggleVoice(step)}
               className="col-span-2 rounded-2xl border-2 border-tomato py-3 font-semibold text-tomato disabled:opacity-60"
             >
-              {ASK_LABELS[voiceState]}
+              {askLabels(companion.name)[voiceState]}
             </button>
+          </div>
+          <div className="mt-4">
+            <LanguagePicker />
           </div>
         </div>
         <Pip mood={shownMood} message={status} />

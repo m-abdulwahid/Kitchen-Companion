@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ASSISTANT } from "@/lib/assistant";
+import { useCompanion } from "@/hooks/useCompanion";
 
 const links = [
   { href: "/", label: "Explore" },
@@ -12,6 +12,7 @@ const links = [
 
 export function AppNav() {
   const pathname = usePathname();
+  const { companion } = useCompanion();
 
   return (
     <header className="sticky top-0 z-20 border-b border-peach/80 bg-cream/90 backdrop-blur">
@@ -23,7 +24,7 @@ export function AppNav() {
           <div>
             <p className="font-display text-xl text-espresso">Kitchen Companion</p>
             <p className="text-xs text-caramel">
-              cook with {ASSISTANT.name} · live · loud · a little messy
+              cook with {companion.name} · live · loud · a little messy
             </p>
           </div>
         </Link>
