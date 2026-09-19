@@ -12,3 +12,6 @@ node_modules/
 
 # usage reports for the organisers: private, do not commit
 artifacts/summary/
+
+
+.backboard/
