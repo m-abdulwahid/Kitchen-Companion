@@ -87,6 +87,14 @@ it does not use Omni. Set `BACKBOARD_API_KEY` in the root `.env` first. The
 full isolation, consent, caching and setup details are in
 [../docs/backboard-memory.md](../docs/backboard-memory.md).
 
+## Sentry observability
+
+Set `SENTRY_DSN` in the root `.env` to enable error monitoring, traces and
+profiling for this FastAPI service. Omni and Backboard spans record operation
+metadata and token counts only—never audio, images, prompts or memory text.
+The browser setup and demo procedure are in
+[../docs/sentry-observability.md](../docs/sentry-observability.md).
+
 **Test page:** http://localhost:8000/vision. It shows your camera, sends a photo every 2 to 10 seconds, and lists what Omni saw and said with a timestamp (to line up with a recording). Pick an attached camera from the Camera list after pressing Start. It skips photos when the picture has not changed, stops itself after 200 photos, and only sends when it is running.
 
 Smoke test with the sample clip:

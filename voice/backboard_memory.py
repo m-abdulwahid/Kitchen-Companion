@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+import sentry_sdk
 
 API_URL = "https://app.backboard.io/api"
 ASSISTANT_PREFIX = "Kitchen Companion Memory"
@@ -78,8 +79,10 @@ class BackboardMemory:
         if not self.enabled:
             return None
         headers = {"X-API-Key": self.api_key, "Content-Type": "application/json"}
-        async with httpx.AsyncClient(timeout=8.0, trust_env=False) as client:
-            response = await client.request(method, f"{API_URL}{path}", headers=headers, **kwargs)
+        with sentry_sdk.start_span(op="backboard.memory", name=f"Backboard {method} memory") as span:
+            async with httpx.AsyncClient(timeout=8.0, trust_env=False) as client:
+                response = await client.request(method, f"{API_URL}{path}", headers=headers, **kwargs)
+            span.set_data("http.response.status_code", response.status_code)
         response.raise_for_status()
         return response.json() if response.content else {}
 

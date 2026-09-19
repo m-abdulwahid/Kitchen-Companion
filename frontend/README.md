@@ -52,6 +52,13 @@ Add `BACKBOARD_API_KEY` to the root `.env` and restart the service on port
 save or forget a preference. It is isolated to that browser and recalled for
 relevant camera-agent turns. See [the memory guide](../docs/backboard-memory.md).
 
+## Sentry observability
+
+Phase 5 adds errors, performance traces, privacy-masked Session Replay, and
+backend profiling for the camera-to-coaching flow. Configure `SENTRY_DSN` in
+the root `.env` and `NEXT_PUBLIC_SENTRY_DSN` in `.env.local`, then restart both
+services. See [the Sentry demo guide](../docs/sentry-observability.md).
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

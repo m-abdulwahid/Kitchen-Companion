@@ -2,6 +2,8 @@
 
 Last updated 2026-09-19. Checked against the code, not from memory.
 
+Challenge fit and evidence are tracked in [challenge-coverage.md](challenge-coverage.md).
+
 | Feature | Real? | Details |
 | --- | --- | --- |
 | Explore, cookbook, upload pages, search, diet filters, share link | Real | Cookbook is saved in the browser only (`localStorage`), not on a server. |
@@ -16,6 +18,7 @@ Last updated 2026-09-19. Checked against the code, not from memory.
 | **Recipe from a TikTok / Instagram link** | **Placeholder** | `generateRecipeFromVideo` in `frontend/src/lib/mocks.ts` returns a made-up recipe. Backend work. |
 | Hands-free live voice and proactive camera coach | Implemented; needs one browser microphone/camera validation | `frontend/src/hooks/useLiveSession.ts` captures/resamples microphone audio to 24 kHz PCM16 in an AudioWorklet, streams it through `backend/app.py`, queues reply audio, and cancels it when server VAD detects the cook speaking. While enabled, `useCookingAgent.ts` sends at most 12 changed camera frames (five seconds apart) to the HTTP cooking agent. Safe camera actions update the step UI and nonempty coaching is spoken through the Realtime companion. The existing HTTP voice path remains available. Live mode uses Tina, the only Realtime-validated voice. |
 | Backboard memory | Implemented; needs `BACKBOARD_API_KEY` and one live validation | The cook explicitly saves/forgets a preference in the cooking view. `voice/backboard_memory.py` gives each anonymous browser profile its own Backboard assistant, retrieves up to three relevant facts for the cooking agent, and caches retrieval for three minutes. Omni never receives a key. See [backboard-memory.md](backboard-memory.md). |
+| Sentry observability | Implemented; needs Sentry DSNs and one dashboard validation | Browser tracing + privacy-masked Session Replay cover camera-agent and Backboard requests. The voice service traces/profiles Omni and Backboard calls without recording prompts, images, audio, recipes, or saved memories. See [sentry-observability.md](sentry-observability.md). |
 | Live Realtime relay backend | Real | `backend/app.py` runs on port 8001. It keeps `OMNI_KEY` server-side, accepts PCM16 browser audio, enables the verified server VAD setup, forwards Omni audio events, and supports recipe-step updates/interruption. It has credit-free protocol tests. |
 | Accounts, shared cookbook | Not started | Browser cookbook storage remains local-only. |
 | V2: where to buy food, nutrition | Not started | Deferred. |
