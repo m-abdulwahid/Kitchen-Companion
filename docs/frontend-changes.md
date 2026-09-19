@@ -29,3 +29,33 @@ The rule flags calling `setState` directly inside `useEffect`. Each was fixed by
 - `src/types/speech.d.ts` (browser speech-recognition types)
 
 Still mocked and waiting for their owners: `checkStepWithVision` (vision) and `generateRecipeFromVideo` (backend).
+
+## Cooking companions and languages (new)
+
+You can now pick who cooks with you (Aiden, Tina, Jennifer, Ryan, Mione) and which language they speak (English, Français, Español). How it works: [voice-integration.md](voice-integration.md#cooking-companions-and-languages).
+
+New files:
+
+| File | Job |
+| --- | --- |
+| `src/lib/companions.ts` | The companion line-up (name, voice, blurb, personality). Edit this to change who is offered. |
+| `src/lib/languages.ts` | The language list. |
+| `src/lib/choice-store.ts` | Remembers a choice in the browser (shared by the two below). |
+| `src/lib/companion-store.ts`, `src/lib/language-store.ts` | The stored companion and language. |
+| `src/hooks/useCompanion.ts`, `src/hooks/useLanguage.ts` | Read and set the choices from any component. |
+| `src/components/CompanionPicker.tsx` | Picker with a Listen button per voice, plus the language switcher. |
+| `src/components/LanguagePicker.tsx` | The language switcher. |
+
+Changed files. The assistant's name is no longer the fixed "Pip"; it is the chosen companion:
+
+| File | Change |
+| --- | --- |
+| `src/components/RecipeDetail.tsx` | Shows the picker. The button says "Start cooking with <name>". |
+| `src/components/CookingView.tsx` | Uses the chosen voice, name and language; language switcher under the step buttons; switching language re-reads the step; button labels use the name. |
+| `src/components/Pip.tsx` | The speech bubble shows the companion's name. The mascot drawing is unchanged. It is now a client component. |
+| `src/components/AppNav.tsx`, `UploadFlow.tsx`, `KitchenFlow.tsx` | The name in the tagline and in copy comes from the companion. |
+| `src/lib/voice-api.ts`, `src/hooks/useVoiceAssistant.ts` | Send the voice, name, personality and language with each request. Translated text is shown in the bubble. |
+| `src/lib/mocks.ts` | `checkStepWithVision` takes an optional assistant name. |
+| `src/lib/assistant.ts`, `src/app/layout.tsx` | `ASSISTANT` is now only a fallback; page description no longer says "Pip". |
+
+Not changed: the mascot artwork, the Explore, Cookbook and Upload logic, and the app's own labels (still English).

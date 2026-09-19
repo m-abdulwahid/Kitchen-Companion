@@ -1,0 +1,231 @@
+{
+ "checked_at": "2026-09-19T15:14:12+00:00",
+ "model": "qwen3.5-omni-flash",
+ "test_text": "Hi, I'm Pip, your sous-chef.",
+ "results": {
+  "Tina": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Cindy": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Liora Mira": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Sunnybobi": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Raymond": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Ethan": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Theo Calm": {
+   "ok": true,
+   "audio_s": 2.5
+  },
+  "Serena": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Harvey": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Maia": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Evan": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Qiao": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Momo": {
+   "ok": true,
+   "audio_s": 1.7
+  },
+  "Wil": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Angel": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Li Cassian": {
+   "ok": true,
+   "audio_s": 2.6
+  },
+  "Mia": {
+   "ok": true,
+   "audio_s": 1.6
+  },
+  "Joyner": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Gold": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Katerina": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Ryan": {
+   "ok": true,
+   "audio_s": 1.7
+  },
+  "Jennifer": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Aiden": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Mione": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Sunny": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Dylan": {
+   "ok": true,
+   "audio_s": 2.0
+  },
+  "Eric": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Peter": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Joseph Chen": {
+   "ok": true,
+   "audio_s": 2.0
+  },
+  "Marcus": {
+   "ok": true,
+   "audio_s": 1.9
+  },
+  "Li": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Kiki": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Rocky": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Sohee": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Lenn": {
+   "ok": true,
+   "audio_s": 1.9
+  },
+  "Ono Anna": {
+   "ok": true,
+   "audio_s": 2.3
+  },
+  "Sonrisa": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Bodega": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Emilien": {
+   "ok": true,
+   "audio_s": 1.9
+  },
+  "Andre": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Radio Gol": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Alek": {
+   "ok": true,
+   "audio_s": 2.1
+  },
+  "Rizky": {
+   "ok": true,
+   "audio_s": 2.6
+  },
+  "Roya": {
+   "ok": true,
+   "audio_s": 2.0
+  },
+  "Arda": {
+   "ok": true,
+   "audio_s": 2.3
+  },
+  "Hana": {
+   "ok": true,
+   "audio_s": 2.4
+  },
+  "Dolce": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Jakub": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Griet": {
+   "ok": true,
+   "audio_s": 2.4
+  },
+  "Eliška": {
+   "ok": true,
+   "audio_s": 2.6
+  },
+  "Marina": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Siiri": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Ingrid": {
+   "ok": true,
+   "audio_s": 2.2
+  },
+  "Sigga": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Bea": {
+   "ok": true,
+   "audio_s": 1.8
+  },
+  "Chloe": {
+   "ok": true,
+   "audio_s": 2.3
+  }
+ }
+}

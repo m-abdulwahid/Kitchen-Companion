@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { CompanionPicker } from "@/components/CompanionPicker";
 import { Pip } from "@/components/Pip";
-import { ASSISTANT } from "@/lib/assistant";
+import { useCompanion } from "@/hooks/useCompanion";
 import type { Recipe } from "@/lib/types";
 
 type RecipeDetailProps = {
@@ -21,6 +22,7 @@ export function RecipeDetail({
   onStartCooking,
 }: RecipeDetailProps) {
   const [copied, setCopied] = useState(false);
+  const { companion } = useCompanion();
 
   async function copyShareLink() {
     const url = `${window.location.origin}/?recipe=${recipe.id}`;
@@ -60,13 +62,14 @@ export function RecipeDetail({
             </span>
           ))}
         </div>
+        <CompanionPicker />
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={onStartCooking}
             className="rounded-full bg-tomato px-5 py-3 font-display text-lg text-cream shadow hover:bg-raspberry"
           >
-            Start cooking with {ASSISTANT.name}
+            Start cooking with {companion.name}
           </button>
           <button
             type="button"

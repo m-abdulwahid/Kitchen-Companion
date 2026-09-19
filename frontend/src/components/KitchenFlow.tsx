@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { CookingView } from "@/components/CookingView";
 import { RecipeBrowser } from "@/components/RecipeBrowser";
 import { RecipeDetail } from "@/components/RecipeDetail";
+import { useCompanion } from "@/hooks/useCompanion";
 import { useCookbook } from "@/hooks/useCookbook";
 import type { Recipe } from "@/lib/types";
 
@@ -19,6 +20,7 @@ const neverChanges = () => () => {};
 
 export function KitchenFlow({ mode }: KitchenFlowProps) {
   const cookbook = useCookbook();
+  const { companion } = useCompanion();
   const [picked, setPicked] = useState<Recipe | null>(null);
   const [leftSharedRecipe, setLeftSharedRecipe] = useState(false);
   const [cooking, setCooking] = useState(false);
@@ -66,7 +68,7 @@ export function KitchenFlow({ mode }: KitchenFlowProps) {
       subheading={
         mode === "cookbook"
           ? "Everything you saved — still searchable by ingredient and diet."
-          : "Peek the grid, pick a recipe, then cook live with camera, voice, and Pip in your ear."
+          : `Peek the grid, pick a recipe, then cook live with camera, voice, and ${companion.name} in your ear.`
       }
       emptyMessage={
         mode === "cookbook"

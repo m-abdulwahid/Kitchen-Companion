@@ -4,13 +4,14 @@ import { useState, type FormEvent } from "react";
 import { Pip } from "@/components/Pip";
 import { RecipeDetail } from "@/components/RecipeDetail";
 import { CookingView } from "@/components/CookingView";
+import { useCompanion } from "@/hooks/useCompanion";
 import { useCookbook } from "@/hooks/useCookbook";
-import { ASSISTANT } from "@/lib/assistant";
 import { generateRecipeFromVideo } from "@/lib/mocks";
 import type { Recipe } from "@/lib/types";
 
 export function UploadFlow() {
   const cookbook = useCookbook();
+  const { companion } = useCompanion();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +54,7 @@ export function UploadFlow() {
         Pull a recipe from a video
       </h1>
       <p className="mt-3 text-cocoa/80">
-        Drop a TikTok or Instagram Reels URL. {ASSISTANT.name} drafts the
+        Drop a TikTok or Instagram Reels URL. {companion.name} drafts the
         ingredients, time, cost, and steps — then you can save it to your
         cookbook.
       </p>
@@ -76,7 +77,7 @@ export function UploadFlow() {
           disabled={busy}
           className="mt-4 rounded-full bg-tomato px-5 py-3 font-display text-lg text-cream disabled:opacity-60"
         >
-          {busy ? `${ASSISTANT.name} is watching the clip…` : "Generate recipe"}
+          {busy ? `${companion.name} is watching the clip…` : "Generate recipe"}
         </button>
       </form>
       <div className="mt-6">

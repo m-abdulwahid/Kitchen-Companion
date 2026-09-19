@@ -16,6 +16,18 @@ step shown     -> POST /api/speak  ->  cached? reply at once
                   <- {text, audio}  <- cache, then play audio
 ```
 
+**Where does Pip's voice come from?** From Alibaba's Qwen3.5-Omni model, which has 56 built-in voices. See them, hear them and read where they come from at **http://localhost:8000/voices** (voice service running). More in [omni-voice.md](omni-voice.md#voices).
+
+## Cooking companions and languages
+
+On a recipe page, before cooking, you choose **who cooks with you** and **which language they speak**.
+
+- **Companions:** Aiden, Tina, Jennifer, Ryan and Mione, each with an Omni voice, a one-line personality and a **Listen** button that plays their voice. The choice is remembered in the browser (default: the first, Aiden). The chosen name is used everywhere the assistant is named: the "Start cooking with…" button, the top-bar tagline, the speech bubble, the Ask button, and the assistant introduces itself by that name.
+- **How a companion is defined:** one entry in `frontend/src/lib/companions.ts` with `name`, `voice` (any name from the [voice library](http://localhost:8000/voices)), a `blurb` for the card and a `style` line sent to the voice service so the answers sound like them. To change the line-up, edit that list.
+- **Languages:** English, Français, Español (`frontend/src/lib/languages.ts`). Steps and greetings are translated by Omni and spoken in the chosen voice, and the translated text appears in the speech bubble. Questions are answered in the chosen language whatever language you ask in. The language switcher is also in the cooking view: switching re-reads the current step in the new language at once.
+- **What is not translated:** the app's own labels and buttons stay in English. Only what the companion says is translated. Translations are machine-made; see [omni-voice.md](omni-voice.md#languages-and-translation) for what we checked.
+- The chosen voice and language are sent with every request, including the background prefetch of the next step, so prefetched audio is in the right voice and language.
+
 ## Try it
 
 1. Root `.env` has `OMNI_KEY` (see `.env.example`).
@@ -62,12 +74,23 @@ Rules: there is one audio player. A new `speak()` replaces an older one (so tapp
 | `frontend/src/lib/voice-api.ts` | The HTTP calls from the browser (`askVoice`, `speakText`); reads `NEXT_PUBLIC_VOICE_API_URL` |
 | `frontend/src/hooks/useVoiceAssistant.ts` | Mic recording, sending, playback, `speak()`, the four states above, the browser-voice fallback |
 | `frontend/src/components/CookingView.tsx` | Uses the hook for the "Ask Pip" button, Pip's mood, and reading steps aloud |
+| `frontend/src/lib/companions.ts`, `hooks/useCompanion.ts`, `components/CompanionPicker.tsx` | The companion line-up, the remembered choice, and the picker with Listen buttons |
+| `frontend/src/lib/languages.ts`, `hooks/useLanguage.ts`, `components/LanguagePicker.tsx` | The language list, the remembered choice, and the switcher (recipe page and cooking view) |
+| `frontend/src/lib/choice-store.ts` | Shared "remember this choice in the browser" helper used by both |
 | `frontend/.env.local` | `NEXT_PUBLIC_VOICE_API_URL=http://localhost:8000` (git-ignored; restart `npm run dev` after changing) |
 
 ## Testing
 
 - **Service:** the `curl` command in `voice/README.md`.
 - **Whole flow, no microphone needed:** we verified it with a real Chrome fed `voice/samples/voice_test.wav` as a fake microphone. Checked: steps are spoken with Omni audio (and not the browser voice), the button returns to idle when audio ends, "Repeat aloud" is served from the cache, "Next step" reads the next step, "Ask Pip" interrupts speech and records, the question is answered and spoken, and with the voice service blocked the browser voice reads the step.
+
+## Troubleshooting
+
+**"Pip repeats my question back / the voice is robotic."** You are looking at an old page. Older versions of the app echoed the question ("You asked: …") with a canned answer and spoke with the browser's built-in voice. If you see that, the tab was opened before the current code and never reloaded, which also happens after the dev server is restarted. Fix: hard-reload the tab (Ctrl+Shift+R), or close it and open http://localhost:3000 again. The current version shows only Pip's short answer, with no "You asked".
+
+**How to tell which voice is speaking.** Omni's voice comes from the voice service and starts after a short delay on the first step. The browser's built-in voice starts instantly and sounds noticeably flatter. If you get the built-in voice, the voice service is probably not running or not reachable: check http://127.0.0.1:8000/docs opens.
+
+**Ask Pip says "Can't reach the voice service".** Start the voice service (see [voice/README.md](../voice/README.md)) and confirm `NEXT_PUBLIC_VOICE_API_URL` in `frontend/.env.local` matches its address.
 
 ## Known limits and next steps
 
