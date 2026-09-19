@@ -109,6 +109,28 @@ class SpeechTurnTests(unittest.TestCase):
         self.assertEqual(s.history[-1], ("You", "a29"))
 
 
+class NoPhotoNoSightingsTests(unittest.TestCase):
+    """The agent once claimed to see onions on a turn with no photo, and that invented sighting poisoned the next turn."""
+
+    def test_sightings_are_dropped_when_there_was_no_photo(self):
+        s = agent.Session()
+        d = agent.decide(event="speech", raw=raw(heard="what next", say="Add garlic.", seen="Onions look translucent.", step_done=True),
+                         session=s, step_index=0, n_steps=5, timers=[], has_image=False)
+        self.assertEqual((d["seen"], d["step_done"]), ("", None))
+        self.assertEqual(s.last_seen, "")
+
+    def test_sightings_are_kept_when_there_was_a_photo(self):
+        s = agent.Session()
+        d = agent.decide(event="speech", raw=raw(heard="look", say="Nice.", seen="Golden onions.", step_done=True),
+                         session=s, step_index=0, n_steps=5, timers=[], has_image=True)
+        self.assertEqual((d["seen"], d["step_done"], s.last_seen), ("Golden onions.", True, "Golden onions."))
+
+    def test_an_invented_done_cannot_count_towards_moving_on(self):
+        s = agent.Session()
+        agent.decide(event="text", raw=raw(heard="hi", say="Hello.", step_done=True), session=s, step_index=0, n_steps=5, timers=[], has_image=False)
+        self.assertEqual(s.done_streak, {})
+
+
 class CameraTurnTests(unittest.TestCase):
     def test_one_done_look_is_not_enough_to_move_on(self):
         s = agent.Session()
@@ -208,6 +230,13 @@ class MessageTests(unittest.TestCase):
     def test_frame_turn_carries_the_photo_and_no_audio(self):
         content = self.build(image="data:image/jpeg;base64,AAAA")[1]["content"]
         self.assertEqual([c["type"] for c in content], ["image_url", "text"])
+
+    def test_the_prompt_forbids_inventing_sightings_and_requires_matching_actions(self):
+        system = self.build()[0]["content"]
+        self.assertIn("must be null", system)
+        self.assertIn("never copy them", system)
+        self.assertIn("take the matching action", system)
+        self.assertIn("Remember what the cook tells you", system)
 
     def test_name_style_and_memory_are_used(self):
         s = agent.Session()

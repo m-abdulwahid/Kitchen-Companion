@@ -75,10 +75,17 @@ SYSTEM_PROMPT = (
     "or when the cook agrees to your offer.\n"
     "- {\"type\":\"cancel_timer\",\"label\":\"...\"}: stop a timer.\n"
     "- {\"type\":\"finish\"}: the whole recipe is finished.\n"
-    "Only take an action when the cook asked for it or the situation clearly calls for it. Never act on a guess.\n\n"
+    "Only take an action when the cook asked for it or the situation clearly calls for it. Never act on a guess. "
+    "What you say and what the screen shows must match: if you tell the cook to move on to another step, or what "
+    "the next step is, take the matching action in the same reply, so the screen is on the step you are talking about.\n\n"
+    "Remember what the cook tells you (allergies, what they have or lack, preferences) and use it in later answers: "
+    "if a suggestion would break something they told you, say so.\n\n"
     "Ground everything in the recipe below. For quantities and ingredients use only what is listed; if something is "
     "not listed, say you do not know instead of inventing an amount. For substitutions or technique, give brief, "
     "practical advice. If you cannot see or hear well enough, say so honestly.\n\n"
+    "Only describe what is really in the photo attached to THIS message. If there is no photo, \"seen\" must be empty "
+    "and \"step_done\" must be null. If the photo is dark, blurry, blocked or has no food or cookware in it, say that "
+    "in \"seen\" and set \"step_done\" to null. Earlier sightings listed below may be out of date: never copy them.\n\n"
     "Reply with JSON only, in exactly this shape:\n"
     "{\"heard\": \"what the cook said, or empty if they did not speak\", \"seen\": \"what you see, one short sentence, "
     "or empty if there is no photo\", \"step_done\": true, \"say\": \"...\", \"actions\": []}\n"
@@ -123,7 +130,7 @@ def build_messages(
     if session.said:
         lines.append("You already said (do not repeat): " + " / ".join(session.said))
     if session.last_seen:
-        lines.append("Last thing you saw: " + session.last_seen)
+        lines.append("An earlier photo showed (may be out of date, judge only the new photo): " + session.last_seen)
 
     system = SYSTEM_PROMPT
     if name:
@@ -224,10 +231,14 @@ def decide(
     n_steps: int,
     timers: list[dict],
     auto_advance: bool = True,
+    has_image: bool = True,
     now: Optional[float] = None,
 ) -> dict:
     """Turn Omni's raw decision into the one the app carries out, applying the safety rules."""
     now = time.monotonic() if now is None else now
+    if not has_image:
+        # no photo, no sightings: models sometimes invent "I see ..." and that must not reach the app or the memory
+        raw = {**raw, "seen": "", "step_done": None}
     say = raw["say"]
     actions = validate_actions(raw["actions"], step_index, n_steps, timers)
     step_done = raw["step_done"]

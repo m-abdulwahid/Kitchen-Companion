@@ -696,5 +696,6 @@ async def agent_turn(request: AgentTurnRequest):
     if raw is None:
         raise HTTPException(status_code=502, detail=f"Omni's reply was not in the expected shape: {reply[:200]!r}")
     decision = agent_brain.decide(event=event, raw=raw, session=session, step_index=step_index,
-                                  n_steps=len(steps), timers=timers, auto_advance=request.auto_advance)
+                                  n_steps=len(steps), timers=timers, auto_advance=request.auto_advance,
+                                  has_image=bool(image))
     return {**decision, "usage": used, "step_index": step_index}
