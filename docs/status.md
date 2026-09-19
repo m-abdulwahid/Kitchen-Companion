@@ -13,7 +13,9 @@ Last updated 2026-09-19. Checked against the code, not from memory.
 | Speak and answer in English, French or Spanish | Real, machine-translated | Translations are made by Omni as it speaks. Read by us, not checked by a native speaker; the app's own labels stay English. See [omni-voice.md](omni-voice.md#languages-and-translation). |
 | **Check my step (vision)** | **Placeholder** | See below. |
 | **Recipe from a TikTok / Instagram link** | **Placeholder** | `generateRecipeFromVideo` in `frontend/src/lib/mocks.ts` returns a made-up recipe. Backend work. |
-| Backend service, accounts, shared cookbook | Not started | `backend/` holds only a README. |
+| Hands-free live voice | Implemented; needs one browser microphone validation | `frontend/src/hooks/useLiveSession.ts` captures/resamples microphone audio to 24 kHz PCM16 in an AudioWorklet, streams it through `backend/app.py`, queues reply audio, and cancels it when server VAD detects the cook speaking. The existing HTTP voice path remains available. Live mode uses Tina, the only Realtime-validated voice. |
+| Live Realtime relay backend | Real | `backend/app.py` runs on port 8001. It keeps `OMNI_KEY` server-side, accepts PCM16 browser audio, enables the verified server VAD setup, forwards Omni audio events, and supports recipe-step updates/interruption. It has credit-free protocol tests. |
+| Accounts, shared cookbook | Not started | Browser cookbook storage remains local-only. |
 | V2: where to buy food, nutrition | Not started | Deferred. |
 
 ## Vision ("Check my step"): the camera works, the checking does not

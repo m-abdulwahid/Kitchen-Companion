@@ -1,0 +1,14 @@
+# Copy to .env and fill in. Read by the Python services (voice/, and backend/ + vision/ if they need it).
+# The frontend has its own env file: frontend/.env.local (Next.js only reads env from its own folder).
+OMNI_KEY=
+OMNI_BASE_URL=https://yibuapi.com/v1
+OMNI_MODEL=qwen3.5-omni-flash
+# Spoken voice for replies. Any of the 56 voices in the voice library: run the voice service and open
+# http://localhost:8000/voices to browse and hear them (list: voice/voices.json).
+OMNI_VOICE=Tina
+
+# Set to 1 to make voice/ return a canned reply without calling Omni.
+# VOICE_MOCK=1
+
+# Recipe API (recipeapi.io) for the Explore page. Server-side only — never NEXT_PUBLIC_.
+RECIPE_API_KEY=

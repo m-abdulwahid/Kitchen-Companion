@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice library</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #fff6ec; --card: #ffffff; --ink: #3d2418; --muted: #8a6a58; --line: #f0dccb;
+    --accent: #e85d4c; --accent-ink: #ffffff; --ok: #2f8a4f; --bad: #b3261e; --chip: #fde8d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1410; --card: #2a1d17; --ink: #f6e6d8; --muted: #b99a86; --line: #3f2c22;
+            --accent: #f0705f; --accent-ink: #1d1410; --ok: #6fcf8f; --bad: #ff8a80; --chip: #3f2c22; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 1.8rem; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  a { color: var(--accent); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 24px; margin: 0; }
+  .facts dt { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+  code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .9em; background: var(--chip); padding: 1px 6px; border-radius: 6px; }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; }
+  textarea, input[type=search] { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  textarea { resize: vertical; min-height: 64px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 12px; }
+  .row > input[type=search] { flex: 1 1 220px; width: auto; }
+  .count { color: var(--muted); font-size: .85rem; margin-left: auto; }
+  button { font: inherit; cursor: pointer; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 6px 14px; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card.active { border: 2px solid var(--accent); padding: 13px; }
+  .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .name { font-size: 1.15rem; font-weight: 700; }
+  .tag { font-size: .72rem; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .tag.use { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .desc { color: var(--muted); margin: 0; flex: 1; }
+  .status { font-size: .8rem; }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); } .status.na { color: var(--muted); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .play[disabled] { opacity: .7; cursor: progress; }
+  .err { color: var(--bad); font-size: .85rem; margin: 0; }
+  .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+  .sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Voice library</h1>
+  <p class="sub">Every voice Pip can use. Type a sentence, press Preview, and hear it in that voice.</p>
+
+  <section class="panel" aria-label="Where the voices come from">
+    <dl class="facts" id="facts"></dl>
+    <p class="sub" style="margin:12px 0 0" id="howto"></p>
+  </section>
+
+  <section class="panel" aria-label="Preview text">
+    <label for="text">Text to read</label>
+    <textarea id="text" maxlength="600">Nice work, chef! Your onions look golden, so it's time to add the garlic.</textarea>
+    <div class="row">
+      <label for="lang" style="margin:0">Speak in</label>
+      <select id="lang" title="Text is translated into this language, then spoken"></select>
+      <input type="search" id="search" placeholder="Search by name or description" aria-label="Search voices">
+      <span role="group" aria-label="Filter by gender">
+        <button type="button" data-gender="" aria-pressed="true">All</button>
+        <button type="button" data-gender="F" aria-pressed="false">Female</button>
+        <button type="button" data-gender="M" aria-pressed="false">Male</button>
+      </span>
+      <button type="button" id="workingOnly" aria-pressed="false">Verified only</button>
+      <span class="count" id="count" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden>No voices match.</p>
+</main>
+
+<script>
+(function () {
+  var state = { data: null, gender: "", working: false, query: "" };
+  var player = null, playingName = null;
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  function fact(term, value) {
+    var wrap = document.createElement("div");
+    wrap.appendChild(el("dt", null, term));
+    var dd = el("dd", null, value);
+    wrap.appendChild(dd);
+    $("facts").appendChild(wrap);
+    return dd;
+  }
+
+  function renderHeader(d) {
+    fact("Provider", d.provider || "unknown");
+    fact("Model in use", d.model);
+    fact("Voice in use now", d.active_voice);
+    var src = fact("Official list", "");
+    var a = el("a", null, "Alibaba Cloud voice list");
+    a.href = d.source_url; a.target = "_blank"; a.rel = "noopener";
+    src.appendChild(a);
+    var works = d.voices.filter(function (v) { return v.works === true; }).length;
+    var tested = d.voices.filter(function (v) { return v.works !== null && v.works !== undefined; }).length;
+    fact("Tested on our API", tested ? works + " of " + tested + " work (" + (d.checked_at || "").slice(0, 10) + ", " + d.checked_model + ")" : "not tested yet");
+    fact("Voices", d.voices.length + " for " + d.model_family);
+    var how = $("howto");
+    how.textContent = "To use a voice for real: set ";
+    how.appendChild(el("code", null, "OMNI_VOICE=Name"));
+    how.appendChild(document.createTextNode(" in the root .env file and restart the voice service. Previews here do not change it. " + (d.languages_note || "")));
+  }
+
+  function statusOf(v) {
+    if (v.works === true) return ["ok", "Verified: works on our API"];
+    if (v.works === false) return ["bad", "Failed when tested on our API"];
+    return ["na", "Not tested on our API"];
+  }
+
+  function card(v, d) {
+    var c = el("article", "card" + (v.name === d.active_voice ? " active" : ""));
+    var top = el("div", "top");
+    top.appendChild(el("span", "name", v.name));
+    top.appendChild(el("span", "tag", v.gender === "F" ? "Female" : "Male"));
+    if (v.name === d.active_voice) top.appendChild(el("span", "tag use", "In use"));
+    if (v.name === d.default_voice) top.appendChild(el("span", "tag", "Alibaba default"));
+    c.appendChild(top);
+    c.appendChild(el("p", "desc", v.description));
+    var st = statusOf(v);
+    c.appendChild(el("div", "status " + st[0], st[1]));
+    var actions = el("div", "actions");
+    var play = el("button", "play", "▶ Preview");
+    play.type = "button"; play.dataset.name = v.name;
+    play.setAttribute("aria-label", "Preview " + v.name);
+    var copy = el("button", null, "Copy .env line");
+    copy.type = "button"; copy.dataset.copy = v.name;
+    actions.appendChild(play); actions.appendChild(copy);
+    c.appendChild(actions);
+    c.appendChild(el("p", "err"));
+    return c;
+  }
+
+  function render() {
+    var d = state.data, q = state.query.trim().toLowerCase();
+    var list = d.voices.filter(function (v) {
+      if (state.gender && v.gender !== state.gender) return false;
+      if (state.working && v.works !== true) return false;
+      return !q || (v.name + " " + v.description).toLowerCase().indexOf(q) !== -1;
+    });
+    var grid = $("grid"); grid.textContent = "";
+    // the voice in use goes first
+    list.sort(function (a, b) { return (b.name === d.active_voice) - (a.name === d.active_voice); });
+    list.forEach(function (v) { grid.appendChild(card(v, d)); });
+    $("empty").hidden = list.length > 0;
+    $("count").textContent = list.length + " of " + d.voices.length + " voices";
+  }
+
+  function stop() {
+    if (player) { player.pause(); player = null; }
+    playingName = null;
+    document.querySelectorAll(".play").forEach(function (b) { b.disabled = false; b.textContent = "▶ Preview"; });
+  }
+
+  async function preview(btn) {
+    var name = btn.dataset.name, errEl = btn.closest(".card").querySelector(".err");
+    errEl.textContent = "";
+    if (playingName === name) { stop(); return; }
+    stop();
+    var text = $("text").value.trim();
+    if (!text) { errEl.textContent = "Type some text to read first."; return; }
+    btn.disabled = true; btn.textContent = "Generating…";
+    try {
+      var res = await fetch("/api/speak", { method: "POST", headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ text: text, voice: name, language: $("lang").value }) });
+      if (!res.ok) {
+        var detail = ""; try { detail = (await res.json()).detail; } catch (e) {}
+        throw new Error(detail || ("Voice service error " + res.status));
+      }
+      var reply = await res.json();
+      if (!reply.audio) throw new Error("No audio came back for this voice.");
+      player = new Audio("data:" + reply.audio_mime + ";base64," + reply.audio);
+      playingName = name;
+      btn.disabled = false; btn.textContent = "■ Stop";
+      player.onended = stop;
+      await player.play();
+    } catch (e) {
+      stop();
+      errEl.textContent = e.message;
+    }
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button");
+    if (!t) return;
+    if (t.classList.contains("play")) preview(t);
+    else if (t.dataset.copy) {
+      var line = "OMNI_VOICE=" + t.dataset.copy;
+      (navigator.clipboard ? navigator.clipboard.writeText(line) : Promise.reject()).then(
+        function () { t.textContent = "Copied: " + line; }, function () { t.textContent = line; });
+      setTimeout(function () { t.textContent = "Copy .env line"; }, 2500);
+    } else if (t.hasAttribute("data-gender")) {
+      state.gender = t.dataset.gender;
+      document.querySelectorAll("[data-gender]").forEach(function (b) { b.setAttribute("aria-pressed", String(b === t)); });
+      render();
+    } else if (t.id === "workingOnly") {
+      state.working = !state.working; t.setAttribute("aria-pressed", String(state.working)); render();
+    }
+  });
+  $("search").addEventListener("input", function (e) { state.query = e.target.value; render(); });
+
+  fetch("/api/voices").then(function (r) { return r.json(); }).then(function (d) {
+    state.data = d; renderHeader(d);
+    (d.languages || []).forEach(function (l) { var o = el("option", null, l.name); o.value = l.code; $("lang").appendChild(o); });
+    render();
+  }).catch(function () {
+    $("grid").appendChild(el("p", "empty", "Could not load the voice list. Is the voice service running?"));
+  });
+})();
+</script>
+</body>
+</html>

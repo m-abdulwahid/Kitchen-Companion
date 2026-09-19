@@ -1,0 +1,324 @@
+"""Realtime Omni relay for the hands-free cooking companion.
+
+The browser sends raw PCM16 frames to this service; only this service opens the
+provider WebSocket, so ``OMNI_KEY`` never enters browser code.  The protocol is
+small on purpose:
+
+* first message: ``session.configure`` with recipe/companion context;
+* binary message: a PCM16 chunk, relayed as ``input_audio_buffer.append``;
+* ``step``: refreshes the current cooking-step prompt without reconnecting;
+* ``interrupt``: cancels a reply and clears queued input audio.
+"""
+from __future__ import annotations
+
+import asyncio
+import base64
+import json
+import os
+import re
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, AsyncIterator, Protocol
+from urllib.parse import urlencode
+
+import websockets
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_ENDPOINT = "wss://yibuapi.com/v1/realtime"
+DEFAULT_MODEL = "qwen3.5-omni-plus-realtime"
+DEFAULT_VOICE = "Tina"  # The only Realtime voice verified in the Phase 0 gate.
+MAX_TEXT_LENGTH = 500
+MAX_PCM_CHUNK_BYTES = 24_000  # 500 ms at 24 kHz mono PCM16.
+LANGUAGES = {"en": "English", "fr": "French", "es": "Spanish"}
+VAD_CONFIG = {
+    "type": "server_vad",
+    "threshold": 0.5,
+    "prefix_padding_ms": 300,
+    "silence_duration_ms": 500,
+}
+
+
+def load_dotenv() -> None:
+    """Load root .env without another dependency, matching voice/app.py."""
+    path = ROOT / ".env"
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_dotenv()
+
+
+@dataclass(frozen=True)
+class Settings:
+    api_key: str
+    model: str
+    endpoint: str
+
+
+def settings_from_env() -> Settings:
+    return Settings(
+        api_key=os.getenv("OMNI_KEY", "").strip(),
+        model=os.getenv("OMNI_REALTIME_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL,
+        endpoint=os.getenv("OMNI_REALTIME_ENDPOINT", DEFAULT_ENDPOINT).strip() or DEFAULT_ENDPOINT,
+    )
+
+
+def clean_text(value: Any, limit: int = MAX_TEXT_LENGTH) -> str:
+    """Keep browser-provided context short, printable, and safe for a prompt."""
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", str(value or "")).strip()[:limit].strip()
+
+
+@dataclass(frozen=True)
+class CookingContext:
+    recipe_title: str
+    current_step: str
+    companion_name: str = "Remy"
+    companion_style: str = "Warm, precise, and encouraging."
+    voice: str = DEFAULT_VOICE
+    language: str = "en"
+
+    @classmethod
+    def from_message(cls, message: dict[str, Any]) -> "CookingContext":
+        companion = message.get("companion")
+        if not isinstance(companion, dict):
+            companion = {}
+        language = clean_text(companion.get("language") or message.get("language") or "en", 8).lower()
+        if language not in LANGUAGES:
+            raise ValueError(f"unsupported language {language!r}; use one of {sorted(LANGUAGES)}")
+        recipe_title = clean_text(message.get("recipe_title"), 120)
+        current_step = clean_text(message.get("current_step"), MAX_TEXT_LENGTH)
+        if not recipe_title or not current_step:
+            raise ValueError("session.configure requires recipe_title and current_step")
+        return cls(
+            recipe_title=recipe_title,
+            current_step=current_step,
+            companion_name=clean_text(companion.get("name") or "Remy", 40),
+            companion_style=clean_text(companion.get("style") or "Warm, precise, and encouraging.", 240),
+            voice=clean_text(companion.get("voice") or DEFAULT_VOICE, 60),
+            language=language,
+        )
+
+    def with_step(self, current_step: Any) -> "CookingContext":
+        step = clean_text(current_step, MAX_TEXT_LENGTH)
+        if not step:
+            raise ValueError("step requires a non-empty current_step")
+        return CookingContext(
+            recipe_title=self.recipe_title,
+            current_step=step,
+            companion_name=self.companion_name,
+            companion_style=self.companion_style,
+            voice=self.voice,
+            language=self.language,
+        )
+
+
+def build_system_prompt(context: CookingContext) -> str:
+    language_instruction = ""
+    if context.language != "en":
+        language_instruction = f" Always answer in {LANGUAGES[context.language]}."
+    return (
+        f"You are {context.companion_name}, a sous-chef coaching someone who is cooking right now. "
+        "Your reply will be spoken aloud. Answer in at most two short, plain sentences, under 30 words total. "
+        "No markdown, lists, asterisks, or emoji. "
+        f"Your personality: {context.companion_style} "
+        f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}."
+        f"{language_instruction}"
+    )
+
+
+def session_update(context: CookingContext) -> dict[str, Any]:
+    """The known-good VAD setup from the Phase 0 Realtime gate."""
+    return {
+        "type": "session.update",
+        "session": {
+            "modalities": ["text", "audio"],
+            "voice": context.voice,
+            "instructions": build_system_prompt(context),
+            "input_audio_format": "pcm16",
+            "turn_detection": VAD_CONFIG,
+        },
+    }
+
+
+def audio_append(pcm: bytes) -> dict[str, str]:
+    if not pcm:
+        raise ValueError("audio chunk is empty")
+    if len(pcm) > MAX_PCM_CHUNK_BYTES:
+        raise ValueError(f"audio chunk exceeds {MAX_PCM_CHUNK_BYTES} bytes")
+    return {
+        "type": "input_audio_buffer.append",
+        "audio": base64.b64encode(pcm).decode("ascii"),
+    }
+
+
+class UpstreamSocket(Protocol):
+    async def send(self, message: str) -> None: ...
+
+    async def recv(self) -> str | bytes: ...
+
+
+@asynccontextmanager
+async def open_upstream(settings: Settings) -> AsyncIterator[UpstreamSocket]:
+    """Connect with proxy discovery disabled, as in the vendor example."""
+    if not settings.api_key:
+        raise RuntimeError("OMNI_KEY is not configured on the backend")
+    query = urlencode({"model": settings.model})
+    url = settings.endpoint + ("&" if "?" in settings.endpoint else "?") + query
+    async with websockets.connect(
+        url,
+        additional_headers={"Authorization": f"Bearer {settings.api_key}"},
+        proxy=None,
+        open_timeout=30,
+        close_timeout=5,
+        max_size=32 * 1024 * 1024,
+    ) as upstream:
+        yield upstream
+
+
+def parse_upstream(raw: str | bytes) -> dict[str, Any]:
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    event = json.loads(raw)
+    if not isinstance(event, dict):
+        raise RuntimeError("Omni sent a non-object event")
+    return event
+
+
+async def configure_upstream(upstream: UpstreamSocket, context: CookingContext) -> list[dict[str, Any]]:
+    """Complete the provider handshake before accepting microphone frames."""
+    created = parse_upstream(await asyncio.wait_for(upstream.recv(), timeout=20))
+    if created.get("type") != "session.created":
+        raise RuntimeError(f"expected session.created, got {created.get('type')}")
+    await upstream.send(json.dumps(session_update(context), ensure_ascii=False))
+    updated = parse_upstream(await asyncio.wait_for(upstream.recv(), timeout=20))
+    if updated.get("type") != "session.updated":
+        raise RuntimeError(f"expected session.updated, got {updated.get('type')}")
+    return [created, updated]
+
+
+def client_control_to_upstream(message: dict[str, Any], context: CookingContext) -> tuple[list[dict[str, Any]], CookingContext]:
+    """Translate safe client controls; arbitrary provider events never cross this boundary."""
+    message_type = message.get("type")
+    if message_type == "step":
+        updated_context = context.with_step(message.get("current_step") or message.get("step"))
+        return [session_update(updated_context)], updated_context
+    if message_type == "interrupt":
+        return [{"type": "response.cancel"}, {"type": "input_audio_buffer.clear"}], context
+    if message_type == "text":
+        text = clean_text(message.get("text"), MAX_TEXT_LENGTH)
+        if not text:
+            raise ValueError("text requires a non-empty value")
+        return [
+            {"type": "conversation.item.create", "item": {
+                "type": "message", "role": "user", "content": [{"type": "input_text", "text": text}],
+            }},
+            {"type": "response.create"},
+        ], context
+    raise ValueError(f"unsupported control message {message_type!r}")
+
+
+async def forward_client(client: WebSocket, upstream: UpstreamSocket, context: CookingContext) -> None:
+    """Map browser PCM/control messages to the small allowed upstream protocol."""
+    current_context = context
+    while True:
+        incoming = await client.receive()
+        if incoming["type"] == "websocket.disconnect":
+            return
+        if incoming.get("bytes") is not None:
+            events = [audio_append(incoming["bytes"])]
+        elif incoming.get("text") is not None:
+            try:
+                payload = json.loads(incoming["text"])
+                if not isinstance(payload, dict):
+                    raise ValueError("control message must be a JSON object")
+                events, current_context = client_control_to_upstream(payload, current_context)
+            except (ValueError, json.JSONDecodeError) as exc:
+                await client.send_json({"type": "relay.error", "code": "invalid_client_message", "message": str(exc)})
+                continue
+        else:
+            continue
+        for event in events:
+            await upstream.send(json.dumps(event, ensure_ascii=False))
+
+
+async def forward_upstream(client: WebSocket, upstream: UpstreamSocket) -> None:
+    """Forward provider events unchanged; the browser receives no provider credential."""
+    while True:
+        raw = await upstream.recv()
+        if isinstance(raw, bytes):
+            await client.send_bytes(raw)
+        else:
+            await client.send_text(raw)
+
+
+async def relay(client: WebSocket, upstream: UpstreamSocket, context: CookingContext) -> None:
+    client_task = asyncio.create_task(forward_client(client, upstream, context))
+    upstream_task = asyncio.create_task(forward_upstream(client, upstream))
+    done, pending = await asyncio.wait({client_task, upstream_task}, return_when=asyncio.FIRST_COMPLETED)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    for task in done:
+        exception = task.exception()
+        if exception:
+            raise exception
+
+
+app = FastAPI(title="Whisker live relay")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+async def health() -> dict[str, Any]:
+    settings = settings_from_env()
+    return {
+        "ok": True,
+        "service": "whisker-live-relay",
+        "model": settings.model,
+        "omni_key_configured": bool(settings.api_key),
+    }
+
+
+@app.websocket("/api/live/{session_id}")
+async def live_session(client: WebSocket, session_id: str) -> None:
+    await client.accept()
+    safe_session_id = clean_text(session_id, 80)
+    try:
+        initial = await asyncio.wait_for(client.receive_json(), timeout=20)
+        if not isinstance(initial, dict) or initial.get("type") != "session.configure":
+            raise ValueError("first message must be a session.configure JSON object")
+        context = CookingContext.from_message(initial)
+        settings = settings_from_env()
+        async with open_upstream(settings) as upstream:
+            handshake_events = await configure_upstream(upstream, context)
+            for event in handshake_events:
+                await client.send_json(event)
+            await client.send_json({"type": "relay.ready", "session_id": safe_session_id})
+            await relay(client, upstream, context)
+    except WebSocketDisconnect:
+        return
+    except (ValueError, RuntimeError, asyncio.TimeoutError, websockets.WebSocketException) as exc:
+        await client.send_json({"type": "relay.error", "message": str(exc)})
+    finally:
+        await client.close()
+
+
+@app.get("/")
+async def root() -> None:
+    raise HTTPException(status_code=404, detail="Use /health or /api/live/{session_id}")
