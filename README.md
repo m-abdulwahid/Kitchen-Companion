@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/whisker-banner.gif" alt="Whisker: Whisk-Ella, your masterchef cat. Anyone can cook, with a camera and a voice at your shoulder." width="100%">
+</p>
+
 # Whisker
 
 Whisker is an AI cooking mentor. **Whisk-Ella**, your masterchef cat (Ella for short), teaches you the recipe, watches your steps through the camera, and answers your questions out loud, so your messy hands stay off the screen. Speech, hearing and vision all run on Omni (Qwen3.5-Omni via yibuapi).
@@ -66,7 +70,7 @@ Kitchen-Companion/
 │   └── requirements.txt
 ├── backend/      Live relay (FastAPI) and its tests
 ├── vision/       Camera test script; the vision check itself runs inside voice/ for now
-├── docs/         Notes and write-ups (start with docs/status.md); whisker-banner.gif is the banner below
+├── docs/         Notes and write-ups (start with docs/status.md); whisker-banner.gif is the banner at the top
 ├── scripts/      Helper and probe scripts, and the usage report
 ├── examples/     Vendor API examples (read-only reference)
 ├── artifacts/    API call log, written by the voice service
@@ -193,14 +197,3 @@ Cameras and microphones only work over `localhost` or https, so a phone needs an
 | Memory | Backboard (optional) |
 | Error tracking | Sentry (optional) |
 | Recipes | recipeapi.io |
-
-## Privacy and data
-
-- Camera photos and microphone audio go from your browser to our servers, and on to Omni to be understood. The Omni key never reaches the browser.
-- The call log (`artifacts/yibu_api_calls.jsonl`) records the time, model, purpose and token counts of each call. It does not record prompts, photos or audio.
-- The cookbook stays in your browser.
-- Cooking memory keeps only what the cook explicitly asks it to remember, under an anonymous per-browser id. Casual speech is not saved.
-
-<p align="center">
-  <img src="docs/whisker-banner.gif" alt="Whisker: Whisk-Ella, your masterchef cat. Anyone can cook, with a camera and a voice at your shoulder." width="100%">
-</p>
