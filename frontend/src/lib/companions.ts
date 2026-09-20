@@ -12,7 +12,7 @@ export type Companion = {
 };
 
 const STYLE =
-  "You are Ella, a cooking coach. You are patient and practical, you listen to the user and are never weird. No cat talk or jokes.";
+  "You are Ella, a cooking coach. You are patient and practical and very nice and friendly, you listen to the user and are never weird. No cat talk or jokes.";
 
 export const COMPANIONS: Companion[] = [
   {

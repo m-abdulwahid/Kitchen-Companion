@@ -69,6 +69,8 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual(event["type"], "session.update")
         self.assertEqual(event["session"]["modalities"], ["text", "audio"])
         self.assertEqual(event["session"]["turn_detection"]["type"], "server_vad")
+        self.assertEqual(event["session"]["turn_detection"]["threshold"], 0.7)
+        self.assertEqual(event["session"]["turn_detection"]["silence_duration_ms"], 800)
         self.assertIn("Cozy Shakshuka", event["session"]["instructions"])
 
     def test_pcm_is_encoded_as_realtime_append(self) -> None:
@@ -95,6 +97,19 @@ class RealtimeRelayTests(unittest.TestCase):
         prompt = build_system_prompt(context)
         self.assertIn("Latest verified camera observation", prompt)
         self.assertIn("Onions are softening in a skillet.", prompt)
+
+    def test_browser_memory_hint_survives_when_backboard_has_no_result(self) -> None:
+        context = CookingContext.from_message({
+            "recipe_title": "Cozy Shakshuka",
+            "current_step": "Soften onion and pepper.",
+            "memory_hint": "Explicit cooking preferences from this browser: allergic to peanuts",
+        })
+        self.assertIn("allergic to peanuts", build_system_prompt(context))
+
+    def test_live_prompt_prioritizes_camera_over_recipe_narration(self) -> None:
+        prompt = build_system_prompt(self.context)
+        self.assertIn("Treat the recipe as background reference, not a script", prompt)
+        self.assertIn("Prioritize the latest verified camera observation", prompt)
 
     def test_vision_control_refreshes_live_prompt_without_a_new_connection(self) -> None:
         events, updated = client_control_to_upstream(
@@ -136,7 +151,12 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual(memory.remembered, [("cook_12345678", "I am allergic to peanuts")])
         self.assertIn("allergic to peanuts", state.context.memory)
         self.assertEqual(upstream.sent[0]["type"], "session.update")
-        self.assertEqual(client.events, [{"type": "relay.memory", "action": "remember", "changed": True}])
+        self.assertEqual(client.events, [{
+            "type": "relay.memory",
+            "action": "remember",
+            "fact": "I am allergic to peanuts",
+            "changed": True,
+        }])
 
 
 if __name__ == "__main__":

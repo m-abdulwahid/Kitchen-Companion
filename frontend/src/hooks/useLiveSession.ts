@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liveSocketUrl } from "@/lib/live-api";
-import { cookingMemoryProfileId } from "@/lib/cooking-profile";
+import { cookingMemoryHint, cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Speaker } from "@/lib/voice-api";
 
 export type LiveState = "idle" | "connecting" | "listening" | "speaking" | "error";
@@ -14,6 +14,7 @@ type Options = {
   onReply: (text: string) => void;
   onError: (message: string) => void;
   onSpeechStarted?: () => void;
+  onMemoryChange?: (action: "remember" | "forget", fact: string, changed: boolean) => void;
 };
 
 type LiveStart = {
@@ -32,6 +33,7 @@ type RealtimeEvent = {
   message?: string;
   action?: "remember" | "forget";
   changed?: boolean;
+  fact?: string;
 };
 
 const OUTPUT_SAMPLE_RATE = 24_000;
@@ -57,7 +59,7 @@ function eventMessage(event: RealtimeEvent): string {
  * AudioWorklet produces 24 kHz PCM16 microphone frames. Incoming Omni PCM16
  * chunks are scheduled onto one AudioContext timeline, so replies never overlap.
  */
-export function useLiveSession({ recipeTitle, currentStep, companion, onReply, onError, onSpeechStarted }: Options) {
+export function useLiveSession({ recipeTitle, currentStep, companion, onReply, onError, onSpeechStarted, onMemoryChange }: Options) {
   const [state, setState] = useState<LiveState>("idle");
   const stateRef = useRef<LiveState>("idle");
   const socketRef = useRef<WebSocket | null>(null);
@@ -74,13 +76,13 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
   const finishTimerRef = useRef<number | null>(null);
   const transcriptRef = useRef("");
   const openingGreetingRef = useRef("");
-  const callbacksRef = useRef({ onReply, onError, onSpeechStarted });
+  const callbacksRef = useRef({ onReply, onError, onSpeechStarted, onMemoryChange });
   const contextRef = useRef({ recipeTitle, currentStep, companion });
 
   useEffect(() => {
-    callbacksRef.current = { onReply, onError, onSpeechStarted };
+    callbacksRef.current = { onReply, onError, onSpeechStarted, onMemoryChange };
     contextRef.current = { recipeTitle, currentStep, companion };
-  }, [companion, currentStep, onError, onReply, onSpeechStarted, recipeTitle]);
+  }, [companion, currentStep, onError, onMemoryChange, onReply, onSpeechStarted, recipeTitle]);
 
   const changeState = useCallback((next: LiveState) => {
     stateRef.current = next;
@@ -238,6 +240,9 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           changeState("error");
           return;
         case "relay.memory":
+          if (event.action && event.fact) {
+            callbacksRef.current.onMemoryChange?.(event.action, event.fact, Boolean(event.changed));
+          }
           callbacksRef.current.onReply(
             event.action === "forget"
               ? event.changed ? "Ella removed that kitchen memory." : "Ella could not find a matching kitchen memory."
@@ -323,6 +328,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           current_step: details.currentStep,
           companion: details.companion,
           memory_profile_id: cookingMemoryProfileId(),
+          memory_hint: cookingMemoryHint(),
           camera_observation: opening?.cameraObservation.trim().slice(0, 320) ?? "",
         }));
       };

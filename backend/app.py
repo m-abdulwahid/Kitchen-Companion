@@ -39,9 +39,11 @@ MAX_PCM_CHUNK_BYTES = 24_000  # 500 ms at 24 kHz mono PCM16.
 LANGUAGES = {"en": "English", "fr": "French", "es": "Spanish"}
 VAD_CONFIG = {
     "type": "server_vad",
-    "threshold": 0.5,
+    # Reject quiet kitchen noise and background whispers before they can
+    # interrupt a spoken reply. Browser capture also enables noise suppression.
+    "threshold": 0.7,
     "prefix_padding_ms": 300,
-    "silence_duration_ms": 500,
+    "silence_duration_ms": 800,
 }
 
 
@@ -112,6 +114,7 @@ class CookingContext:
             companion_style=clean_text(companion.get("style") or "Warm, precise, and encouraging.", 240),
             voice=clean_text(companion.get("voice") or DEFAULT_VOICE, 60),
             language=language,
+            memory=clean_text(message.get("memory_hint"), 800),
             observation=clean_text(message.get("camera_observation"), 320),
         )
 
@@ -179,6 +182,10 @@ def build_system_prompt(context: CookingContext) -> str:
         f"You are {context.companion_name}, a sous-chef coaching someone who is cooking right now. "
         "Your reply will be spoken aloud. Answer in at most two short, plain sentences, under 30 words total. "
         "No markdown, lists, asterisks, or emoji. "
+        "Treat the recipe as background reference, not a script: never recite, summarize, or advance its steps "
+        "unless the cook explicitly asks what to do next, asks for a repeat, or asks for directions. "
+        "Prioritize the latest verified camera observation when answering what the cook is doing or what they should do now. "
+        "Never invent a visual detail that is not in that observation. "
         f"Your personality: {context.companion_style} "
         f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}. "
         f"{observation_instruction}"
@@ -330,7 +337,10 @@ async def with_live_memory(context: CookingContext, profile_id: str) -> CookingC
         remembered = await LIVE_MEMORY.recall(profile_id, query)
     except (httpx.HTTPError, RuntimeError, ValueError):
         return context
-    return context.with_memory(memory_context(remembered))
+    recalled_context = memory_context(remembered)
+    if recalled_context and context.memory:
+        return context.with_memory(f"{recalled_context} {context.memory}")
+    return context.with_memory(recalled_context or context.memory)
 
 
 async def persist_voice_memory(
@@ -354,7 +364,7 @@ async def persist_voice_memory(
             changed = await LIVE_MEMORY.forget(state.memory_profile_id, command.fact)
         state.context = await with_live_memory(state.context, state.memory_profile_id)
         await upstream.send(json.dumps(session_update(state.context), ensure_ascii=False))
-        await client.send_json({"type": "relay.memory", "action": command.action, "changed": changed})
+        await client.send_json({"type": "relay.memory", "action": command.action, "fact": command.fact, "changed": changed})
     except (httpx.HTTPError, RuntimeError, ValueError):
         await client.send_json({"type": "relay.memory_error", "message": "Kitchen memory could not be updated."})
 
@@ -445,7 +455,12 @@ async def live_session(client: WebSocket, session_id: str) -> None:
     except (ValueError, RuntimeError, asyncio.TimeoutError, websockets.WebSocketException) as exc:
         await client.send_json({"type": "relay.error", "message": str(exc)})
     finally:
-        await client.close()
+        # A browser disconnect or an upstream failure may already have closed
+        # the ASGI socket. Closing it again raises and obscures the real error.
+        try:
+            await client.close()
+        except RuntimeError:
+            pass
 
 
 @app.get("/")
