@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CompanionPicker } from "@/components/CompanionPicker";
+import { LanguagePicker } from "@/components/LanguagePicker";
 
 type RecipeOverflowMenuProps = {
   saved: boolean;
@@ -66,7 +66,7 @@ export function RecipeOverflowMenu({
         {open ? (
           <div
             role="menu"
-            className="absolute right-0 mt-2 w-64 overflow-visible rounded-2xl bg-white py-2 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
+            className="absolute right-0 mt-2 w-52 overflow-visible rounded-2xl bg-white py-2 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
           >
             <button
               type="button"
@@ -80,7 +80,7 @@ export function RecipeOverflowMenu({
             </button>
             <div className="mx-3 my-2 border-t border-peach/70" />
             <div className="px-3 pb-2">
-              <CompanionPicker />
+              <LanguagePicker compact />
             </div>
           </div>
         ) : null}

@@ -1,6 +1,6 @@
 export type DietTag = "halal" | "vegetarian" | "vegan" | "gluten-free";
 
-export type Meal = "breakfast" | "snack" | "lunch" | "dinner";
+export type Meal = "breakfast" | "snack" | "lunch" | "dinner" | "dessert";
 
 export type RecipeSource = "kitchen" | "tiktok" | "instagram" | "youtube" | "web" | "api";
 

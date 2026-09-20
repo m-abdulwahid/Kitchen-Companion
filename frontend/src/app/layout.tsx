@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import { AppNav } from "@/components/AppNav";
+import { BrandMark } from "@/components/BrandMark";
 import "./globals.css";
 
 const nunito = Nunito({
@@ -25,9 +26,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${nunito.variable} ${fredoka.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col font-sans">
+      <body className="flex min-h-full font-sans">
         <AppNav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-20 border-b border-peach/80 bg-cream/90 px-4 py-3 backdrop-blur">
+            <div className="flex items-center gap-2">
+              <BrandMark
+                src="/brand/whisk-ella-logo.png"
+                alt="Whiskers logo"
+                className="h-10 w-10"
+              />
+              <p className="font-display text-xl text-espresso">Whiskers</p>
+            </div>
+          </header>
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+        </div>
       </body>
     </html>
   );

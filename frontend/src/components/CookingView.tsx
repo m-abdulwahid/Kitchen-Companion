@@ -79,8 +79,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     recipeTitle: recipe.title,
     currentStep: step,
     companion: {
-      // Tina is the only voice validated against the Realtime endpoint in Phase 0.
-      voice: "Tina",
+      voice: companion.voice,
       name: companion.name,
       style: companion.style,
       language: language.code,
@@ -290,7 +289,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
               <img
                 src="/brand/whisk-ella-avatar.png"
                 alt=""
-                className="h-7 w-7 rounded-full bg-white object-cover"
+                className="h-8 w-7 bg-transparent object-contain"
               />
               {askLabels(ASSISTANT.name)[voiceState]}
             </button>
