@@ -14,7 +14,7 @@ the privacy expected of a camera-and-voice cooking app.
 | Error Monitoring | The Next.js client/server/edge SDKs and FastAPI SDK capture unhandled errors. Frontend camera and memory requests surface failed response status in their spans. |
 | Performance Tracing | The browser creates a `camera-agent turn` span. The Python service adds OMNI and Backboard spans with operation name, model/status, and token counts. The trace shows which leg is slow. |
 | Session Replay | 10% of browser sessions and every error session are sampled. All text is masked and all media is blocked, so replays do not contain recipe text, camera video, microphone data, or saved preferences. |
-| Profiling | The FastAPI voice service enables Sentry profiling for traced sessions, giving us server-side evidence when the agent or provider layer is expensive. |
+| Profiling | The FastAPI voice service enables Sentry profiling for traced sessions. The Next.js Node runtime uses `@sentry/profiling-node`, while browser profiling is enabled for sampled traces with the required `Document-Policy: js-profiling` header. |
 
 This exceeds the challenge requirement of two products beyond error monitoring:
 we use tracing, Session Replay, and profiling.

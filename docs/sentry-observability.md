@@ -13,7 +13,10 @@ analytics: camera frame → cooking agent → Omni / Backboard → spoken coachi
 - **Session Replay:** 10% of sessions and every error session are sampled. All
   text is masked and media is blocked, so the replay never records the recipe,
   saved preferences, microphone data, or camera stream.
-- **Profiling:** the Python service profiles traced voice-service sessions.
+- **Profiling:** the Python service profiles traced voice-service sessions. The
+  Next.js Node runtime uses `@sentry/profiling-node`; browser profiling runs
+  only for sampled traces when the browser supports `Document-Policy:
+  js-profiling`.
 
 ## Setup
 
