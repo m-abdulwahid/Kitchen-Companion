@@ -98,6 +98,11 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertIn("Latest verified camera observation", prompt)
         self.assertIn("Onions are softening in a skillet.", prompt)
 
+    def test_live_prompt_prioritizes_camera_over_recipe_narration(self) -> None:
+        prompt = build_system_prompt(self.context)
+        self.assertIn("Treat the recipe as background reference, not a script", prompt)
+        self.assertIn("Prioritize the latest verified camera observation", prompt)
+
     def test_vision_control_refreshes_live_prompt_without_a_new_connection(self) -> None:
         events, updated = client_control_to_upstream(
             {"type": "vision", "observation": "Noodles are simmering in a skillet."}, self.context,
