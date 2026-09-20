@@ -71,8 +71,9 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual(event["type"], "session.update")
         self.assertEqual(event["session"]["modalities"], ["text", "audio"])
         self.assertEqual(event["session"]["turn_detection"]["type"], "server_vad")
-        self.assertEqual(event["session"]["turn_detection"]["threshold"], 0.7)
-        self.assertEqual(event["session"]["turn_detection"]["silence_duration_ms"], 800)
+        self.assertEqual(event["session"]["turn_detection"]["threshold"], 0.82)
+        self.assertEqual(event["session"]["turn_detection"]["prefix_padding_ms"], 400)
+        self.assertEqual(event["session"]["turn_detection"]["silence_duration_ms"], 1_000)
         self.assertIn("Cozy Shakshuka", event["session"]["instructions"])
 
     def test_pcm_is_encoded_as_realtime_append(self) -> None:

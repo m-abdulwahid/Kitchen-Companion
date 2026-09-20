@@ -39,11 +39,12 @@ MAX_PCM_CHUNK_BYTES = 24_000  # 500 ms at 24 kHz mono PCM16.
 LANGUAGES = {"en": "English", "fr": "French", "es": "Spanish"}
 VAD_CONFIG = {
     "type": "server_vad",
-    # Reject quiet kitchen noise and background whispers before they can
-    # interrupt a spoken reply. Browser capture also enables noise suppression.
-    "threshold": 0.7,
-    "prefix_padding_ms": 300,
-    "silence_duration_ms": 800,
+    # The browser has a short, local speech gate too. This higher confidence
+    # threshold keeps a pan clatter or someone walking nearby from interrupting
+    # a reply after it reaches the Realtime service.
+    "threshold": 0.82,
+    "prefix_padding_ms": 400,
+    "silence_duration_ms": 1_000,
 }
 
 

@@ -7,6 +7,46 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
     this.output = [];
     this.targetRate = 24000;
     this.chunkSamples = 2400; // 100 ms at 24 kHz
+    // The browser noise-suppression constraint is helpful but device-specific.
+    // Require two 100 ms voice-level chunks before audio can reach Realtime, so
+    // a short knock, footsteps, or a pan clatter cannot interrupt Ella. Keep
+    // 300 ms of pre-roll and a one-second hangover so normal speech stays whole.
+    this.voiceEnergyThreshold = 0.018;
+    this.activationChunks = 2;
+    this.preRollChunks = 3;
+    this.hangoverChunks = 10;
+    this.loudChunkCount = 0;
+    this.activeChunkCount = 0;
+    this.preRoll = [];
+  }
+
+  energy(samples) {
+    let total = 0;
+    for (let index = 0; index < samples.length; index += 1) total += samples[index] ** 2;
+    return Math.sqrt(total / samples.length);
+  }
+
+  postChunk(buffer) {
+    this.port.postMessage(buffer, [buffer]);
+  }
+
+  gateChunk(samples, buffer) {
+    const isVoiceLevel = this.energy(samples) >= this.voiceEnergyThreshold;
+    if (this.activeChunkCount > 0) {
+      this.postChunk(buffer);
+      this.activeChunkCount = isVoiceLevel ? this.hangoverChunks : this.activeChunkCount - 1;
+      return;
+    }
+
+    this.preRoll.push(buffer);
+    if (this.preRoll.length > this.preRollChunks) this.preRoll.shift();
+    this.loudChunkCount = isVoiceLevel ? this.loudChunkCount + 1 : 0;
+    if (this.loudChunkCount < this.activationChunks) return;
+
+    for (const queued of this.preRoll) this.postChunk(queued);
+    this.preRoll = [];
+    this.loudChunkCount = 0;
+    this.activeChunkCount = this.hangoverChunks;
   }
 
   process(inputs) {
@@ -36,7 +76,7 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
         const value = Math.max(-1, Math.min(1, samples[index]));
         pcm[index] = value < 0 ? value * 0x8000 : value * 0x7fff;
       }
-      this.port.postMessage(pcm.buffer, [pcm.buffer]);
+      this.gateChunk(samples, pcm.buffer);
     }
     return true;
   }
