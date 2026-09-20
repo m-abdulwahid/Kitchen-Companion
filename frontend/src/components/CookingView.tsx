@@ -63,9 +63,6 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const nextStepText =
     stepIndex + 1 < recipe.steps.length ? recipe.steps[stepIndex + 1] : undefined;
   const stepSpeech = `Step ${stepIndex + 1}. ${step}`;
-  const upcomingSpeech = nextStepText
-    ? `Step ${stepIndex + 2}. ${nextStepText}`
-    : undefined;
   const {
     state: voiceState,
     toggle: toggleVoice,
@@ -162,12 +159,6 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       stream?.getTracks().forEach((track) => track.stop());
     };
   }, [cameraTry]);
-
-  useEffect(() => {
-    // Live mode already has the current step in its prompt; avoid an extra HTTP
-    // voice request every time the cook advances a step.
-    if (!handsFreeActive) speak(stepSpeech, upcomingSpeech);
-  }, [handsFreeActive, stepSpeech, upcomingSpeech, speak, language.code]);
 
   async function captureAndCheck() {
     const video = videoRef.current;
