@@ -146,6 +146,16 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health() -> dict[str, bool]:
+    """Credit-free readiness check for the voice, Backboard, and Sentry demo services."""
+    return {
+        "ok": True,
+        "sentry_configured": bool(SENTRY_DSN),
+        "backboard_configured": BACKBOARD_MEMORY.enabled,
+    }
+
+
 def guess_audio_kind(filename: str, content_type: Optional[str]) -> tuple[str, str]:
     ext = Path(filename).suffix.lstrip(".").lower()
     if ext in AUDIO_KINDS:

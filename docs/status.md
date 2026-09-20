@@ -3,6 +3,7 @@
 Last updated 2026-09-19. Checked against the code, not from memory.
 
 Challenge fit and evidence are tracked in [challenge-coverage.md](challenge-coverage.md).
+The repeatable Phase 6 demo sequence is in [demo-runbook.md](demo-runbook.md).
 
 | Feature | Real? | Details |
 | --- | --- | --- |

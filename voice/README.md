@@ -14,6 +14,9 @@ python -m venv .venv
 .\.venv\Scripts\python -m uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
+`GET /health` is a credit-free readiness check. It reports whether Sentry and
+Backboard keys are configured, without revealing either key.
+
 ## API
 
 `POST /api/voice` (multipart form)
