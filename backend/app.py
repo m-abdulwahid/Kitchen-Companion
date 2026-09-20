@@ -48,9 +48,9 @@ VAD_CONFIG = {
     # The browser has a short, local speech gate too. This higher confidence
     # threshold keeps a pan clatter or someone walking nearby from interrupting
     # a reply after it reaches the Realtime service.
-    "threshold": 0.82,
+    "threshold": 0.9,
     "prefix_padding_ms": 400,
-    "silence_duration_ms": 1_000,
+    "silence_duration_ms": 1_200,
 }
 
 

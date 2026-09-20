@@ -8,13 +8,14 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
     this.targetRate = 24000;
     this.chunkSamples = 2400; // 100 ms at 24 kHz
     // The browser noise-suppression constraint is helpful but device-specific.
-    // Require two 100 ms voice-level chunks before audio can reach Realtime, so
-    // a short knock, footsteps, or a pan clatter cannot interrupt Ella. Keep
-    // 300 ms of pre-roll and a one-second hangover so normal speech stays whole.
-    this.voiceEnergyThreshold = 0.018;
-    this.activationChunks = 2;
-    this.preRollChunks = 3;
-    this.hangoverChunks = 10;
+    // Require 300 ms above the room's background level before audio can reach
+    // Realtime, so footsteps, cookware, and brief clatters cannot interrupt
+    // Ella. Keep 400 ms of pre-roll and a short hangover so speech stays whole.
+    this.minimumVoiceEnergy = 0.025;
+    this.noiseFloor = 0.005;
+    this.activationChunks = 3;
+    this.preRollChunks = 4;
+    this.hangoverChunks = 12;
     this.loudChunkCount = 0;
     this.activeChunkCount = 0;
     this.preRoll = [];
@@ -31,7 +32,9 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
   }
 
   gateChunk(samples, buffer) {
-    const isVoiceLevel = this.energy(samples) >= this.voiceEnergyThreshold;
+    const currentEnergy = this.energy(samples);
+    const voiceThreshold = Math.max(this.minimumVoiceEnergy, this.noiseFloor * 3);
+    const isVoiceLevel = currentEnergy >= voiceThreshold;
     if (this.activeChunkCount > 0) {
       this.postChunk(buffer);
       this.activeChunkCount = isVoiceLevel ? this.hangoverChunks : this.activeChunkCount - 1;
@@ -40,6 +43,10 @@ class PcmCaptureProcessor extends AudioWorkletProcessor {
 
     this.preRoll.push(buffer);
     if (this.preRoll.length > this.preRollChunks) this.preRoll.shift();
+    // Learn the steady room noise only from chunks that did not resemble
+    // speech. This lets a laptop microphone adapt to a fan or extractor hood
+    // without allowing that ambience to open the gate.
+    if (!isVoiceLevel) this.noiseFloor = Math.min(0.04, this.noiseFloor * 0.95 + currentEnergy * 0.05);
     this.loudChunkCount = isVoiceLevel ? this.loudChunkCount + 1 : 0;
     if (this.loudChunkCount < this.activationChunks) return;
 

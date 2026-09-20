@@ -91,15 +91,12 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   });
   const applyCameraDecision = (decision: CookingAgentDecision) => {
     if (needsClearerCameraView(decision.seen)) {
-      // A briefly underexposed camera is common while a device starts. Keep
-      // the last good observation instead of speaking an alarming non-update.
-      setStatus("Camera is adjusting…");
-      setEllaMood("listen");
+      // A briefly underexposed camera is common. Do not overwrite Ella's last
+      // spoken reply with a transient camera diagnostic.
       return;
     }
     if (decision.seen) {
       updateObservation(decision.seen);
-      if (!decision.say) setStatus(`Camera: ${decision.seen}`);
     }
     for (const action of decision.actions) {
       if (action.type === "next_step") {
@@ -114,11 +111,13 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       }
     }
     if (decision.say) {
-      setStatus(decision.say);
-      setEllaMood("talk");
       // The agent already rate-limits alerts. Do not make an extra HTTP TTS
-      // request while the live companion is already answering the cook.
-      speakProactively(decision.say);
+      // request or replace its transcript while the live companion is already
+      // answering the cook.
+      if (speakProactively(decision.say)) {
+        setStatus(decision.say);
+        setEllaMood("talk");
+      }
     }
   };
   const { checkNow } = useCookingAgent({
