@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { RecipeGrid } from "@/components/RecipeGrid";
+import { filterAndSortRecipes, type MealFilter } from "@/lib/recipe-search";
 import type { DietTag, Recipe } from "@/lib/types";
 
 const DIETS: { id: DietTag; label: string }[] = [
   { id: "halal", label: "Halal" },
-  { id: "vegetarian", label: "Veggie" },
+  { id: "vegetarian", label: "Vegetarian" },
   { id: "vegan", label: "Vegan" },
   { id: "gluten-free", label: "Gluten free" },
+];
+
+const MEALS: { id: MealFilter; label: string }[] = [
+  { id: "all", label: "All meals" },
+  { id: "breakfast", label: "Breakfast" },
+  { id: "snack", label: "Snacks" },
+  { id: "lunch", label: "Lunch" },
+  { id: "dinner", label: "Dinner" },
 ];
 
 type RecipeBrowserProps = {
@@ -17,8 +26,7 @@ type RecipeBrowserProps = {
   onOpen: (recipe: Recipe) => void;
   heading: string;
   subheading: string;
-  emptyMessage: string;
-  live?: boolean;
+  emptyMessage: ReactNode;
 };
 
 export function RecipeBrowser({
@@ -28,57 +36,14 @@ export function RecipeBrowser({
   heading,
   subheading,
   emptyMessage,
-  live = false,
 }: RecipeBrowserProps) {
   const [query, setQuery] = useState("");
-  const [debounced, setDebounced] = useState("");
   const [diets, setDiets] = useState<DietTag[]>([]);
-  const [remote, setRemote] = useState<Recipe[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [meal, setMeal] = useState<MealFilter>("all");
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(query.trim()), 280);
-    return () => window.clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    if (!live) return;
-    let cancelled = false;
-    const params = new URLSearchParams();
-    if (debounced.includes(",")) params.set("ingredients", debounced);
-    else if (debounced) params.set("search", debounced);
-    if (diets[0]) params.set("dietary_tags", diets[0]);
-    setLoading(true);
-    fetch(`/api/recipes?${params.toString()}`)
-      .then((response) => response.json())
-      .then((data: { recipes?: Recipe[] }) => {
-        if (!cancelled) setRemote(data.recipes ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setRemote(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [debounced, diets, live]);
-
-  const filteredLocal = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return recipes.filter((recipe) => {
-      const matchesDiet =
-        diets.length === 0 || diets.every((diet) => recipe.diets.includes(diet));
-      const haystack = [recipe.title, recipe.description, ...recipe.ingredients]
-        .join(" ")
-        .toLowerCase();
-      return (needle.length === 0 || haystack.includes(needle)) && matchesDiet;
-    });
-  }, [diets, query, recipes]);
-
-  const shown = (live ? remote ?? recipes : filteredLocal).filter((recipe) =>
-    diets.length <= 1 ? true : diets.every((diet) => recipe.diets.includes(diet)),
+  const shown = useMemo(
+    () => filterAndSortRecipes(recipes, query, diets, meal),
+    [diets, meal, query, recipes],
   );
 
   function toggleDiet(diet: DietTag) {
@@ -101,11 +66,30 @@ export function RecipeBrowser({
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="pasta, tomato, chickpeas…"
+            placeholder="grilled cheese, oats, chickpeas…"
             className="mt-2 w-full rounded-2xl border border-peach bg-cream px-4 py-3 text-base text-espresso outline-none ring-tomato/30 placeholder:text-caramel/70 focus:ring-4"
           />
         </label>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {MEALS.map((option) => {
+            const on = meal === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setMeal(option.id)}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  on
+                    ? "bg-espresso text-cream"
+                    : "bg-cream text-cocoa ring-1 ring-peach hover:bg-peach"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {DIETS.map((diet) => {
             const on = diets.includes(diet.id);
             return (
@@ -125,9 +109,6 @@ export function RecipeBrowser({
           })}
         </div>
       </div>
-      {loading ? (
-        <p className="mb-3 text-sm font-semibold text-caramel">Finding dishes…</p>
-      ) : null}
       <RecipeGrid
         recipes={shown}
         savedIds={savedIds}

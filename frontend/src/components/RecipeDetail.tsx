@@ -1,9 +1,8 @@
 "use client";
 
-import { CompanionPicker } from "@/components/CompanionPicker";
+import { Ella } from "@/components/Ella";
+import { IngredientList } from "@/components/IngredientList";
 import { RecipeOverflowMenu } from "@/components/RecipeOverflowMenu";
-import { Remy } from "@/components/Remy";
-import { useCompanion } from "@/hooks/useCompanion";
 import type { Recipe } from "@/lib/types";
 import { useState } from "react";
 
@@ -23,7 +22,6 @@ export function RecipeDetail({
   onStartCooking,
 }: RecipeDetailProps) {
   const [copied, setCopied] = useState(false);
-  const { companion } = useCompanion();
 
   async function copyShareLink() {
     const url = `${window.location.origin}/?recipe=${recipe.id}`;
@@ -81,25 +79,10 @@ export function RecipeDetail({
             onClick={onStartCooking}
             className="mt-6 rounded-full bg-tomato px-6 py-3 font-display text-lg text-cream shadow hover:bg-raspberry"
           >
-            Start cooking with {companion.name}
+            Let&apos;s get cooking!
           </button>
-          <details className="mt-4">
-            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-caramel/80">
-              Voice
-            </summary>
-            <CompanionPicker />
-          </details>
           <h2 className="mt-8 font-display text-2xl text-espresso">Ingredients</h2>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            {recipe.ingredients.map((item) => (
-              <li
-                key={item}
-                className="rounded-2xl bg-cream px-3 py-2 text-sm text-cocoa"
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
+          <IngredientList ingredients={recipe.ingredients} />
         </div>
       </div>
       <div className="flex flex-col gap-4">
@@ -116,7 +99,7 @@ export function RecipeDetail({
             ))}
           </ol>
         </div>
-        <Remy message="I’ll watch the pan and talk you through it. Tap Ask Remy whenever you have a question." />
+        <Ella message="I'll watch the pan and talk you through it. Tap Ask Ella and just say your question." />
       </div>
     </article>
   );

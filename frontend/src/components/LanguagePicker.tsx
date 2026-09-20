@@ -7,7 +7,7 @@ type LanguagePickerProps = {
   compact?: boolean;
 };
 
-/** Choose the language Remy speaks. */
+/** Choose the language Ella speaks. */
 export function LanguagePicker({ compact = false }: LanguagePickerProps) {
   const { language, setLanguage } = useLanguage();
 

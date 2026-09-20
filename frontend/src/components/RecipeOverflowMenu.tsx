@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CompanionPicker } from "@/components/CompanionPicker";
 
 type RecipeOverflowMenuProps = {
   saved: boolean;
@@ -32,7 +33,7 @@ export function RecipeOverflowMenu({
         type="button"
         onClick={onSave}
         aria-label={saved ? "Remove from cookbook" : "Save to cookbook"}
-        title={saved ? "Saved in cookbook" : "Save to cookbook"}
+        title={saved ? "Saved in Your Cookbook" : "Save to Your Cookbook"}
         className={`grid h-10 w-10 place-items-center rounded-full bg-white/95 shadow-sm ring-1 ring-peach/80 hover:bg-peach ${
           saved ? "text-raspberry" : "text-cocoa"
         }`}
@@ -52,7 +53,7 @@ export function RecipeOverflowMenu({
           type="button"
           aria-haspopup="menu"
           aria-expanded={open}
-          aria-label="More recipe actions"
+          aria-label="More recipe options"
           onClick={() => setOpen((value) => !value)}
           className="grid h-10 w-10 place-items-center rounded-full bg-white/95 text-cocoa shadow-sm ring-1 ring-peach/80 hover:bg-peach"
         >
@@ -65,30 +66,22 @@ export function RecipeOverflowMenu({
         {open ? (
           <div
             role="menu"
-            className="absolute right-0 mt-2 w-44 overflow-hidden rounded-2xl bg-white py-1 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
+            className="absolute right-0 mt-2 w-64 overflow-visible rounded-2xl bg-white py-2 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
           >
             <button
               type="button"
               role="menuitem"
               onClick={() => {
                 onShare();
-                setOpen(false);
               }}
               className="block w-full px-4 py-2.5 text-left font-semibold text-cocoa hover:bg-cream"
             >
-              {copied ? "Link copied" : "Copy share link"}
+              {copied ? "Copied" : "🔗 Share"}
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onSave();
-                setOpen(false);
-              }}
-              className="block w-full px-4 py-2.5 text-left font-semibold text-cocoa hover:bg-cream"
-            >
-              {saved ? "Saved in cookbook" : "Save to cookbook"}
-            </button>
+            <div className="mx-3 my-2 border-t border-peach/70" />
+            <div className="px-3 pb-2">
+              <CompanionPicker />
+            </div>
           </div>
         ) : null}
       </div>

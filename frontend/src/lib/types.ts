@@ -1,5 +1,7 @@
 export type DietTag = "halal" | "vegetarian" | "vegan" | "gluten-free";
 
+export type Meal = "breakfast" | "snack" | "lunch" | "dinner";
+
 export type RecipeSource = "kitchen" | "tiktok" | "instagram" | "youtube" | "web" | "api";
 
 export type Recipe = {
@@ -12,6 +14,7 @@ export type Recipe = {
   cost: string;
   servings: number;
   diets: DietTag[];
+  meal: Meal;
   ingredients: string[];
   steps: string[];
   source: RecipeSource;

@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { CookingView } from "@/components/CookingView";
+import { Ella } from "@/components/Ella";
 import { RecipeDetail } from "@/components/RecipeDetail";
-import { Remy } from "@/components/Remy";
 import { useCookbook } from "@/hooks/useCookbook";
 import type { Recipe } from "@/lib/types";
 
@@ -23,7 +23,7 @@ export function UploadFlow() {
     setError("");
     setGuruHint(false);
     if (!url.trim()) {
-      setError("Paste a video or recipe-page link.");
+      setError("Paste a video or recipe-page link — Ella will take it from there.");
       return;
     }
     setBusy(true);
@@ -36,32 +36,20 @@ export function UploadFlow() {
       const data = (await response.json()) as {
         recipe?: Recipe;
         error?: string;
-        cookingGuruUrl?: string;
       };
       if (!response.ok || !data.recipe) {
-        setError(data.error ?? "Could not generate that recipe.");
+        setError(data.error ?? "That clip slipped the whisk.");
         setGuruHint(true);
         return;
       }
       cookbook.addGeneratedRecipe(data.recipe);
       setRecipe(data.recipe);
     } catch {
-      setError("Could not generate that recipe.");
+      setError("That clip slipped the whisk.");
       setGuruHint(true);
     } finally {
       setBusy(false);
     }
-  }
-
-  async function openCookingGuru() {
-    if (url.trim()) {
-      try {
-        await navigator.clipboard.writeText(url.trim());
-      } catch {
-        // clipboard may be blocked
-      }
-    }
-    window.open(COOKING_GURU, "_blank", "noopener,noreferrer");
   }
 
   if (cooking && recipe) {
@@ -86,17 +74,8 @@ export function UploadFlow() {
         Pull a recipe from a video
       </h1>
       <p className="mt-3 text-cocoa/80">
-        Paste a TikTok, Reel, YouTube Short, or recipe-page URL. Whisker drafts
-        the dish so you can cook it with Remy. For stubborn clips we send you to{" "}
-        <a
-          href={COOKING_GURU}
-          target="_blank"
-          rel="noreferrer"
-          className="font-semibold text-tomato hover:underline"
-        >
-          CookingGuru’s video extractor
-        </a>
-        .
+        Paste a TikTok, Reel, YouTube Short, or recipe-page URL. Whisk-Ella
+        drafts the dish so you can cook it with Ella by your side.
       </p>
       <form
         onSubmit={onGenerate}
@@ -112,31 +91,30 @@ export function UploadFlow() {
           />
         </label>
         {error ? <p className="mt-2 text-sm text-raspberry">{error}</p> : null}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-full bg-tomato px-5 py-3 font-display text-lg text-cream disabled:opacity-60"
-          >
-            {busy ? "Watching the clip…" : "Generate recipe"}
-          </button>
-          <button
-            type="button"
-            onClick={openCookingGuru}
-            className="rounded-full border border-peach px-4 py-3 text-sm font-semibold text-cocoa hover:bg-peach"
-          >
-            Extract with CookingGuru
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="mt-4 rounded-full bg-tomato px-5 py-3 font-display text-lg text-cream disabled:opacity-60"
+        >
+          {busy ? "Ella’s watching the clip…" : "Generate recipe"}
+        </button>
         {guruHint ? (
           <p className="mt-3 text-sm text-caramel">
-            Your link is copied when possible — paste it on CookingGuru, then
-            come back and save the result here.
+            If the clip won&apos;t parse,{" "}
+            <a
+              href={COOKING_GURU}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-tomato hover:underline"
+            >
+              try CookingGuru
+            </a>{" "}
+            — I&apos;ll still cook whatever you bring back.
           </p>
         ) : null}
       </form>
       <div className="mt-6">
-        <Remy message="If the clip won’t parse, hit CookingGuru. I’ll still cook whatever you bring back." />
+        <Ella message="If the clip won't parse, try CookingGuru — I'll still cook whatever you bring back." />
       </div>
     </div>
   );

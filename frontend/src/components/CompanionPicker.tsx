@@ -4,15 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ASSISTANT } from "@/lib/assistant";
 import { COMPANIONS, type Companion } from "@/lib/companions";
 import { speakText } from "@/lib/voice-api";
 
 type Phase = { id: string; step: "loading" | "playing" } | null;
 
-/** Small voice chips — Remy stays the chef; this only changes how he sounds. */
 export function CompanionPicker() {
   const { companion, setCompanion } = useCompanion();
   const { language } = useLanguage();
+  const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>(null);
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -44,7 +45,7 @@ export function CompanionPicker() {
     abortRef.current = controller;
     try {
       const reply = await speakText(
-        `Hi, I'm Remy. Let's cook something good!`,
+        `Hi, I'm ${ASSISTANT.name}. Let's whisk something up.`,
         candidate.voice,
         language.code,
         controller.signal,
@@ -61,42 +62,58 @@ export function CompanionPicker() {
     } catch {
       if (controller.signal.aborted) return;
       setPhase(null);
-      setError("Couldn't play that voice.");
+      setError("That voice is camera-shy. Try again in a beat.");
     }
   }
 
   return (
-    <div className="mt-2">
-      <div className="flex flex-wrap items-center gap-1.5">
-        {COMPANIONS.map((item) => {
-          const selected = item.id === companion.id;
-          const active = phase?.id === item.id;
-          return (
-            <div key={item.id} className="flex overflow-hidden rounded-full border border-peach">
-              <button
-                type="button"
-                onClick={() => setCompanion(item.id)}
-                className={`px-2.5 py-0.5 text-xs font-semibold ${
-                  selected ? "bg-tomato text-cream" : "bg-cream text-cocoa hover:bg-peach"
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between rounded-xl bg-cream px-3 py-2 text-left text-xs font-semibold text-cocoa hover:bg-peach"
+      >
+        <span>📁 Voice options · {companion.label}</span>
+        <span>{open ? "▾" : "▸"}</span>
+      </button>
+      {open ? (
+        <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border border-peach bg-white p-2">
+          {COMPANIONS.map((item) => {
+            const selected = item.id === companion.id;
+            const active = phase?.id === item.id;
+            return (
+              <div
+                key={item.id}
+                className={`flex items-center justify-between rounded-lg px-2 py-1.5 ${
+                  selected ? "bg-peach/80" : "hover:bg-cream"
                 }`}
               >
-                {item.label}
-              </button>
-              <button
-                type="button"
-                onClick={() => listen(item)}
-                aria-label={`Preview ${item.label} voice`}
-                className="border-l border-peach bg-white px-1.5 text-[10px] font-semibold text-caramel hover:bg-peach"
-              >
-                {active ? (phase?.step === "loading" ? "…" : "■") : "▶"}
-              </button>
-            </div>
-          );
-        })}
-        <LanguagePicker compact />
-      </div>
+                <button
+                  type="button"
+                  onClick={() => setCompanion(item.id)}
+                  className="flex-1 text-left text-xs font-semibold text-espresso"
+                >
+                  {item.label}
+                  <span className="block text-[10px] font-normal text-caramel">
+                    {item.blurb}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => listen(item)}
+                  aria-label={`Preview ${item.label}`}
+                  className="rounded-full px-2 text-[10px] font-semibold text-caramel hover:bg-peach"
+                >
+                  {active ? (phase?.step === "loading" ? "…" : "■") : "▶"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      <LanguagePicker compact />
       {error ? (
-        <p role="alert" className="mt-1 text-xs text-raspberry">
+        <p role="alert" className="text-xs text-raspberry">
           {error}
         </p>
       ) : null}
