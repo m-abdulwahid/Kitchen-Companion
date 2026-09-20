@@ -5,8 +5,17 @@ import asyncio
 import base64
 import json
 import unittest
+from unittest.mock import patch
 
-from backend.app import CookingContext, audio_append, client_control_to_upstream, configure_upstream, session_update
+from backend.app import (
+    CookingContext,
+    RelayState,
+    audio_append,
+    client_control_to_upstream,
+    configure_upstream,
+    persist_voice_memory,
+    session_update,
+)
 
 
 class FakeUpstream:
@@ -19,6 +28,31 @@ class FakeUpstream:
 
     async def send(self, message: str) -> None:
         self.sent.append(json.loads(message))
+
+
+class FakeClient:
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+
+    async def send_json(self, event: dict) -> None:
+        self.events.append(event)
+
+
+class FakeMemory:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.remembered: list[tuple[str, str]] = []
+
+    async def remember(self, profile_id: str, fact: str) -> bool:
+        self.remembered.append((profile_id, fact))
+        return True
+
+    async def forget(self, profile_id: str, fact: str) -> bool:
+        return False
+
+    async def recall(self, profile_id: str, query: str) -> list[str]:
+        return ["allergic to peanuts"]
 
 
 class RealtimeRelayTests(unittest.TestCase):
@@ -55,11 +89,33 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual([event["type"] for event in events], ["response.cancel", "input_audio_buffer.clear"])
         self.assertEqual(unchanged, self.context)
 
+    def test_proactive_message_requests_a_spoken_camera_update(self) -> None:
+        events, unchanged = client_control_to_upstream(
+            {"type": "proactive", "text": "The onions are starting to scorch."}, self.context,
+        )
+        self.assertEqual([event["type"] for event in events], ["conversation.item.create", "response.create"])
+        self.assertIn("Say exactly this", events[0]["item"]["content"][0]["text"])
+        self.assertEqual(unchanged, self.context)
+
     def test_handshake_relay_has_no_network_dependency(self) -> None:
         upstream = FakeUpstream([{"type": "session.created"}, {"type": "session.updated"}])
         events = asyncio.run(configure_upstream(upstream, self.context))
         self.assertEqual([event["type"] for event in events], ["session.created", "session.updated"])
         self.assertEqual(upstream.sent[0]["type"], "session.update")
+
+    def test_explicit_voice_memory_is_saved_and_refreshes_the_live_prompt(self) -> None:
+        memory = FakeMemory()
+        client = FakeClient()
+        upstream = FakeUpstream([])
+        state = RelayState(self.context, memory_profile_id="cook_12345678")
+        with patch("backend.app.LIVE_MEMORY", memory):
+            asyncio.run(persist_voice_memory(
+                client, upstream, state, "Please remember that I am allergic to peanuts.",
+            ))
+        self.assertEqual(memory.remembered, [("cook_12345678", "I am allergic to peanuts")])
+        self.assertIn("allergic to peanuts", state.context.memory)
+        self.assertEqual(upstream.sent[0]["type"], "session.update")
+        self.assertEqual(client.events, [{"type": "relay.memory", "action": "remember", "changed": True}])
 
 
 if __name__ == "__main__":

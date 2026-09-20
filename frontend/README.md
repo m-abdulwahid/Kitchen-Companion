@@ -16,20 +16,48 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Hands-free live cooking
+## Hands-free live cooking and camera coach
 
-Phase 2 uses the relay in `../backend/`. In one terminal, run the backend from
-the repository root:
+The complete Phase 3 demo uses three local services. From the repository root,
+start the HTTP voice/vision and cooking-agent service:
+
+```bash
+.venv/bin/uvicorn voice.app:app --reload --port 8000
+```
+
+In a second terminal, start the Realtime relay:
 
 ```bash
 .venv/bin/uvicorn backend.app:app --reload --port 8001
 ```
 
-In another, run this frontend. Copy `.env.local.example` to `.env.local` if
-the relay is not at `http://localhost:8001`. The browser file contains only
-the relay URL—never put API keys in it. Open a recipe, start cooking, then use
-**Enable hands-free Remy** once to grant microphone permission. After that,
-talk normally and speak over Remy to interrupt a reply.
+In a third terminal, run this frontend:
+
+```bash
+npm run dev
+```
+
+Copy `.env.local.example` to `.env.local` if either local URL differs. The
+browser file contains only service URLs—never put API keys in it. Open a
+recipe, start cooking, and use **Enable hands-free Remy** once to grant camera
+and microphone permission. After that, talk normally and speak over Remy to
+interrupt a reply. The camera coach sends a compressed JPEG only when the view
+changes, at most once every five seconds and 12 times per hands-free session;
+turn hands-free off to stop it immediately.
+
+## Durable Backboard memory
+
+Add `BACKBOARD_API_KEY` to the root `.env` and restart the service on port
+8000. In the cooking view, **Remy's kitchen memory** lets the cook explicitly
+save or forget a preference. It is isolated to that browser and recalled for
+relevant camera-agent turns. See [the memory guide](../docs/backboard-memory.md).
+
+## Sentry observability
+
+Phase 5 adds errors, performance traces, privacy-masked Session Replay, and
+backend profiling for the camera-to-coaching flow. Configure `SENTRY_DSN` in
+the root `.env` and `NEXT_PUBLIC_SENTRY_DSN` in `.env.local`, then restart both
+services. See [the Sentry demo guide](../docs/sentry-observability.md).
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
