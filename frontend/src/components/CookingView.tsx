@@ -29,13 +29,23 @@ function openingGreeting(observation: string): string {
 }
 
 async function waitForVisibleCameraFrame(video: HTMLVideoElement): Promise<CameraFrame | null> {
-  const deadline = performance.now() + 3_000;
+  const deadline = performance.now() + 2_000;
+  let visibleFrames = 0;
   while (performance.now() < deadline) {
     const frame = captureCameraFrame(video);
-    if (frame && hasVisibleCameraImage(frame)) return frame;
+    if (frame && hasVisibleCameraImage(frame)) {
+      visibleFrames += 1;
+      if (visibleFrames >= 2) return frame;
+    } else {
+      visibleFrames = 0;
+    }
     await new Promise<void>((resolve) => window.setTimeout(resolve, 150));
   }
   return null;
+}
+
+function needsClearerCameraView(observation: string): boolean {
+  return /\b(?:too dark|completely black|camera (?:is )?black|can(?:not|'t) see|unable to see|no (?:food|cookware|hands|cook))\b|\b(?:photo|image|frame)\b.{0,24}\b(?:dark|black|blurry|blocked|covered)\b/i.test(observation);
 }
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
@@ -77,6 +87,13 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     onSpeechStarted: () => setVoiceQuestionCount((count) => count + 1),
   });
   const applyCameraDecision = (decision: CookingAgentDecision) => {
+    if (needsClearerCameraView(decision.seen)) {
+      // A briefly underexposed camera is common while a device starts. Keep
+      // the last good observation instead of speaking an alarming non-update.
+      setStatus("Camera is adjusting…");
+      setEllaMood("listen");
+      return;
+    }
     if (decision.seen) {
       updateObservation(decision.seen);
       if (!decision.say) setStatus(`Camera: ${decision.seen}`);
@@ -155,37 +172,43 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
 
   async function enableHandsFree() {
     const video = videoRef.current;
-    const frame = video ? await waitForVisibleCameraFrame(video) : null;
-    if (!frame) {
-      setCameraProblem("The camera feed is black or still starting. Uncover it, add light, or close another app using the camera, then press Try again.");
-      setStatus("Ella is waiting for a usable camera frame.");
-      setEllaMood("idle");
-      return;
-    }
     setStartingHandsFree(true);
-    setStatus("Ella is taking a quick look first…");
+    setStatus("Ella is checking the kitchen…");
     setEllaMood("listen");
     const sessionId = newCookingSessionId();
     try {
-      // This first image is deliberately separate from the live audio socket.
-      // We ignore actions here: an opening glance must never advance a recipe.
-      const decision = await checkCookingFrame(
-        frame.image,
-        sessionId,
-        recipe,
-        stepIndex,
-        { name: companion.name, style: companion.style },
-        cookingMemoryProfileId(),
-      );
-      const observation = decision.seen.trim();
-      if (!observation) {
-        setStatus("Ella needs a clearer look at the food before starting hands-free coaching.");
-        setEllaMood("idle");
+      // Wait locally for exposure to settle, then retry one unusable visual
+      // verdict silently rather than having Ella announce a dark first frame.
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const frame = video ? await waitForVisibleCameraFrame(video) : null;
+        if (!frame) break;
+        const decision = await checkCookingFrame(
+          frame.image,
+          sessionId,
+          recipe,
+          stepIndex,
+          { name: companion.name, style: companion.style },
+          cookingMemoryProfileId(),
+        );
+        const observation = decision.seen.trim();
+        if (!observation || needsClearerCameraView(observation)) {
+          if (attempt < 2) {
+            setStatus("Camera is adjusting…");
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 300));
+            continue;
+          }
+          break;
+        }
+        // This first image is deliberately separate from the live audio socket.
+        // We ignore actions here: an opening glance must never advance a recipe.
+        setCameraSeed({ frame, sessionId });
+        setStatus(`Camera: ${observation}`);
+        await startLive({ cameraObservation: observation, greeting: openingGreeting(observation) });
         return;
       }
-      setCameraSeed({ frame, sessionId });
-      setStatus(`Camera: ${observation}`);
-      await startLive({ cameraObservation: observation, greeting: openingGreeting(observation) });
+      setCameraProblem("The camera needs a clearer, brighter view before Ella can start. Uncover it, add light, or close another app using the camera, then press Try again.");
+      setStatus("Ella is waiting for a usable camera frame.");
+      setEllaMood("idle");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Ella could not check the camera yet. Try again.");
       setEllaMood("idle");

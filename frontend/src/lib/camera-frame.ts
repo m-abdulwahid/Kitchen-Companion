@@ -43,5 +43,5 @@ export function hasVisibleCameraImage(frame: CameraFrame): boolean {
     total += pixel;
     lightest = Math.max(lightest, pixel);
   }
-  return total / frame.thumbnail.length >= 8 || lightest >= 20;
+  return total / frame.thumbnail.length >= 18 && lightest >= 45;
 }
