@@ -7,7 +7,7 @@ import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 import type { Speaker } from "@/lib/voice-api";
 
-const FRAME_INTERVAL_MS = 5_000;
+const FRAME_INTERVAL_MS = 3_000;
 const MAX_AUTO_FRAMES = 12;
 const CHANGE_THRESHOLD = 9;
 
