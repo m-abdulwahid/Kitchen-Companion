@@ -68,9 +68,12 @@ function emojiFor(cuisine?: string, mealType?: string) {
 
 export function inferMeal(title: string, mealType?: string): Meal {
   const key = `${mealType ?? ""} ${title}`.toLowerCase();
+  if (/(dessert|brownie|cookie|cake|ice cream|mug cake|chocolate)/.test(key)) {
+    return "dessert";
+  }
   if (/(breakfast|oat|pancake|waffle|egg|granola)/.test(key)) return "breakfast";
-  if (/(snack|toast|hummus|chip|cookie|yogurt|parfait)/.test(key)) return "snack";
-  if (/(lunch|sandwich|wrap|salad|ramen|quesadilla)/.test(key)) return "lunch";
+  if (/(snack|toast|hummus|chip|yogurt|parfait)/.test(key)) return "snack";
+  if (/(lunch|sandwich|wrap|salad|ramen|quesadilla|indomie)/.test(key)) return "lunch";
   if (/(dinner|pasta|rice|chicken|steak|soup)/.test(key)) return "dinner";
   return "dinner";
 }
