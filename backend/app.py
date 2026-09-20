@@ -114,6 +114,7 @@ class CookingContext:
             companion_style=clean_text(companion.get("style") or "Warm, precise, and encouraging.", 240),
             voice=clean_text(companion.get("voice") or DEFAULT_VOICE, 60),
             language=language,
+            memory=clean_text(message.get("memory_hint"), 800),
             observation=clean_text(message.get("camera_observation"), 320),
         )
 
@@ -336,7 +337,10 @@ async def with_live_memory(context: CookingContext, profile_id: str) -> CookingC
         remembered = await LIVE_MEMORY.recall(profile_id, query)
     except (httpx.HTTPError, RuntimeError, ValueError):
         return context
-    return context.with_memory(memory_context(remembered))
+    recalled_context = memory_context(remembered)
+    if recalled_context and context.memory:
+        return context.with_memory(f"{recalled_context} {context.memory}")
+    return context.with_memory(recalled_context or context.memory)
 
 
 async def persist_voice_memory(
@@ -360,7 +364,7 @@ async def persist_voice_memory(
             changed = await LIVE_MEMORY.forget(state.memory_profile_id, command.fact)
         state.context = await with_live_memory(state.context, state.memory_profile_id)
         await upstream.send(json.dumps(session_update(state.context), ensure_ascii=False))
-        await client.send_json({"type": "relay.memory", "action": command.action, "changed": changed})
+        await client.send_json({"type": "relay.memory", "action": command.action, "fact": command.fact, "changed": changed})
     except (httpx.HTTPError, RuntimeError, ValueError):
         await client.send_json({"type": "relay.memory_error", "message": "Kitchen memory could not be updated."})
 

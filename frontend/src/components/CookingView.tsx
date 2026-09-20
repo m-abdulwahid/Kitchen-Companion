@@ -9,7 +9,7 @@ import { useLiveSession } from "@/hooks/useLiveSession";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
 import { captureCameraFrame, hasVisibleCameraImage, type CameraFrame } from "@/lib/camera-frame";
-import { cookingMemoryProfileId } from "@/lib/cooking-profile";
+import { cookingMemoryProfileId, recordCookingMemory } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 
 type CookingViewProps = {
@@ -85,6 +85,9 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     onReply: setStatus,
     onError: setStatus,
     onSpeechStarted: () => setVoiceQuestionCount((count) => count + 1),
+    onMemoryChange: (action, fact, changed) => {
+      if (changed) recordCookingMemory(action, fact);
+    },
   });
   const applyCameraDecision = (decision: CookingAgentDecision) => {
     if (needsClearerCameraView(decision.seen)) {

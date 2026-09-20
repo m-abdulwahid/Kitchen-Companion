@@ -98,6 +98,14 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertIn("Latest verified camera observation", prompt)
         self.assertIn("Onions are softening in a skillet.", prompt)
 
+    def test_browser_memory_hint_survives_when_backboard_has_no_result(self) -> None:
+        context = CookingContext.from_message({
+            "recipe_title": "Cozy Shakshuka",
+            "current_step": "Soften onion and pepper.",
+            "memory_hint": "Explicit cooking preferences from this browser: allergic to peanuts",
+        })
+        self.assertIn("allergic to peanuts", build_system_prompt(context))
+
     def test_live_prompt_prioritizes_camera_over_recipe_narration(self) -> None:
         prompt = build_system_prompt(self.context)
         self.assertIn("Treat the recipe as background reference, not a script", prompt)
@@ -143,7 +151,12 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual(memory.remembered, [("cook_12345678", "I am allergic to peanuts")])
         self.assertIn("allergic to peanuts", state.context.memory)
         self.assertEqual(upstream.sent[0]["type"], "session.update")
-        self.assertEqual(client.events, [{"type": "relay.memory", "action": "remember", "changed": True}])
+        self.assertEqual(client.events, [{
+            "type": "relay.memory",
+            "action": "remember",
+            "fact": "I am allergic to peanuts",
+            "changed": True,
+        }])
 
 
 if __name__ == "__main__":
