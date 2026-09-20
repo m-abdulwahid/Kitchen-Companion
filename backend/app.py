@@ -91,6 +91,7 @@ class CookingContext:
     voice: str = DEFAULT_VOICE
     language: str = "en"
     memory: str = ""
+    observation: str = ""
 
     @classmethod
     def from_message(cls, message: dict[str, Any]) -> "CookingContext":
@@ -111,6 +112,7 @@ class CookingContext:
             companion_style=clean_text(companion.get("style") or "Warm, precise, and encouraging.", 240),
             voice=clean_text(companion.get("voice") or DEFAULT_VOICE, 60),
             language=language,
+            observation=clean_text(message.get("camera_observation"), 320),
         )
 
     def with_step(self, current_step: Any) -> "CookingContext":
@@ -125,6 +127,7 @@ class CookingContext:
             voice=self.voice,
             language=self.language,
             memory=self.memory,
+            observation=self.observation,
         )
 
     def with_memory(self, memory: str) -> "CookingContext":
@@ -136,6 +139,19 @@ class CookingContext:
             voice=self.voice,
             language=self.language,
             memory=clean_text(memory, 800),
+            observation=self.observation,
+        )
+
+    def with_observation(self, observation: Any) -> "CookingContext":
+        return CookingContext(
+            recipe_title=self.recipe_title,
+            current_step=self.current_step,
+            companion_name=self.companion_name,
+            companion_style=self.companion_style,
+            voice=self.voice,
+            language=self.language,
+            memory=self.memory,
+            observation=clean_text(observation, 320),
         )
 
 
@@ -152,12 +168,20 @@ def build_system_prompt(context: CookingContext) -> str:
     language_instruction = ""
     if context.language != "en":
         language_instruction = f" Always answer in {LANGUAGES[context.language]}."
+    observation_instruction = (
+        f"Latest verified camera observation: {context.observation}. Use this only as evidence from a recent still frame, "
+        "not as a claim that you have a continuous live view. If the cook asks about visual detail not in this observation, "
+        "ask them to point the camera at it. "
+        if context.observation
+        else "There is no verified camera observation yet. Do not claim that you can see the cook or their food. "
+    )
     return (
         f"You are {context.companion_name}, a sous-chef coaching someone who is cooking right now. "
         "Your reply will be spoken aloud. Answer in at most two short, plain sentences, under 30 words total. "
         "No markdown, lists, asterisks, or emoji. "
         f"Your personality: {context.companion_style} "
         f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}. "
+        f"{observation_instruction}"
         "If the cook explicitly says ‘remember’ or ‘forget’ followed by a preference, briefly confirm it. "
         f"{context.memory}"
         f"{language_instruction}"
@@ -239,6 +263,12 @@ def client_control_to_upstream(message: dict[str, Any], context: CookingContext)
     message_type = message.get("type")
     if message_type == "step":
         updated_context = context.with_step(message.get("current_step") or message.get("step"))
+        return [session_update(updated_context)], updated_context
+    if message_type == "vision":
+        observation = clean_text(message.get("observation"), 320)
+        if not observation:
+            raise ValueError("vision requires a non-empty observation")
+        updated_context = context.with_observation(observation)
         return [session_update(updated_context)], updated_context
     if message_type == "interrupt":
         return [{"type": "response.cancel"}, {"type": "input_audio_buffer.clear"}], context

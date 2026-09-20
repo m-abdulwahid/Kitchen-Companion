@@ -36,8 +36,9 @@ root `.env`; it does not prevent the Huawei/Sentry demo.
 2. Save one explicit preference in **Ella's kitchen memory**, such as `no
    peanuts`, or say “Ella, remember that I am allergic to peanuts.” This
    demonstrates consent-based durable memory once Backboard is configured.
-3. Enable hands-free Ella. Show the camera coaching a changed frame, then ask
-   a brief cooking question and speak over Ella to interrupt its reply.
+3. Enable hands-free Ella. She takes one initial camera look before speaking a
+   grounded welcome. Then show one changed frame update, ask a brief cooking
+   question, and speak over Ella to interrupt her reply.
 4. Let the camera confirm a completed step twice to demonstrate safe automatic
    advancement. Stop after one or two checks to conserve Omni credits.
 5. In Sentry, show the `camera-agent turn` trace and the backend span. Session

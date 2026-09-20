@@ -11,6 +11,7 @@ from backend.app import (
     CookingContext,
     RelayState,
     audio_append,
+    build_system_prompt,
     client_control_to_upstream,
     configure_upstream,
     persist_voice_memory,
@@ -83,6 +84,26 @@ class RealtimeRelayTests(unittest.TestCase):
         self.assertEqual(events[0]["type"], "session.update")
         self.assertEqual(updated.current_step, "Add garlic and cumin.")
         self.assertIn("Add garlic and cumin.", events[0]["session"]["instructions"])
+
+    def test_camera_observation_is_added_to_the_initial_live_prompt(self) -> None:
+        context = CookingContext.from_message({
+            "recipe_title": "Cozy Shakshuka",
+            "current_step": "Soften onion and pepper.",
+            "camera_observation": "Onions are softening in a skillet.",
+            "companion": {"name": "Ella", "voice": "Tina", "language": "en"},
+        })
+        prompt = build_system_prompt(context)
+        self.assertIn("Latest verified camera observation", prompt)
+        self.assertIn("Onions are softening in a skillet.", prompt)
+
+    def test_vision_control_refreshes_live_prompt_without_a_new_connection(self) -> None:
+        events, updated = client_control_to_upstream(
+            {"type": "vision", "observation": "Noodles are simmering in a skillet."}, self.context,
+        )
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["type"], "session.update")
+        self.assertEqual(updated.observation, "Noodles are simmering in a skillet.")
+        self.assertIn("Noodles are simmering in a skillet.", events[0]["session"]["instructions"])
 
     def test_interrupt_cancels_reply_and_clears_buffer(self) -> None:
         events, unchanged = client_control_to_upstream({"type": "interrupt"}, self.context)

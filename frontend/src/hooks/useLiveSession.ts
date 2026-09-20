@@ -13,6 +13,14 @@ type Options = {
   companion: Speaker;
   onReply: (text: string) => void;
   onError: (message: string) => void;
+  onSpeechStarted?: () => void;
+};
+
+type LiveStart = {
+  /** A grounded description produced from the frame checked immediately before connecting. */
+  cameraObservation: string;
+  /** A short, already-grounded opening line to speak once the relay is ready. */
+  greeting: string;
 };
 
 type RealtimeEvent = {
@@ -49,7 +57,7 @@ function eventMessage(event: RealtimeEvent): string {
  * AudioWorklet produces 24 kHz PCM16 microphone frames. Incoming Omni PCM16
  * chunks are scheduled onto one AudioContext timeline, so replies never overlap.
  */
-export function useLiveSession({ recipeTitle, currentStep, companion, onReply, onError }: Options) {
+export function useLiveSession({ recipeTitle, currentStep, companion, onReply, onError, onSpeechStarted }: Options) {
   const [state, setState] = useState<LiveState>("idle");
   const stateRef = useRef<LiveState>("idle");
   const socketRef = useRef<WebSocket | null>(null);
@@ -65,13 +73,14 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
   const closedByUserRef = useRef(false);
   const finishTimerRef = useRef<number | null>(null);
   const transcriptRef = useRef("");
-  const callbacksRef = useRef({ onReply, onError });
+  const openingGreetingRef = useRef("");
+  const callbacksRef = useRef({ onReply, onError, onSpeechStarted });
   const contextRef = useRef({ recipeTitle, currentStep, companion });
 
   useEffect(() => {
-    callbacksRef.current = { onReply, onError };
+    callbacksRef.current = { onReply, onError, onSpeechStarted };
     contextRef.current = { recipeTitle, currentStep, companion };
-  }, [companion, currentStep, onError, onReply, recipeTitle]);
+  }, [companion, currentStep, onError, onReply, onSpeechStarted, recipeTitle]);
 
   const changeState = useCallback((next: LiveState) => {
     stateRef.current = next;
@@ -164,6 +173,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
   const stop = useCallback(() => {
     closedByUserRef.current = true;
     readyRef.current = false;
+    openingGreetingRef.current = "";
     socketRef.current?.close();
     socketRef.current = null;
     flushPlayback();
@@ -182,6 +192,12 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
     flushPlayback();
     sendControl({ type: "interrupt" });
   }, [flushPlayback, sendControl]);
+
+  /** Refresh the text-only description that grounds later live voice replies. */
+  const updateObservation = useCallback((observation: string) => {
+    const value = observation.trim().slice(0, 320);
+    if (value) sendControl({ type: "vision", observation: value });
+  }, [sendControl]);
 
   /** Speak a validated camera-coach update only when the companion is free to respond. */
   const speakProactively = useCallback((text: string): boolean => {
@@ -206,6 +222,15 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
         case "relay.ready":
           readyRef.current = true;
           changeState("listening");
+          {
+            const greeting = openingGreetingRef.current;
+            openingGreetingRef.current = "";
+            const socket = socketRef.current;
+            if (greeting && socket?.readyState === WebSocket.OPEN) {
+              responseFinishedRef.current = false;
+              socket.send(JSON.stringify({ type: "proactive", text: greeting }));
+            }
+          }
           return;
         case "relay.error":
         case "error":
@@ -223,6 +248,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           callbacksRef.current.onError(eventMessage(event));
           return;
         case "input_audio_buffer.speech_started":
+          callbacksRef.current.onSpeechStarted?.();
           // A new utterance must always beat an old reply.
           if (stateRef.current === "speaking") interrupt();
           return;
@@ -253,7 +279,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
     [changeState, interrupt, maybeFinishResponse, queueAudio],
   );
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (opening?: LiveStart) => {
     if (stateRef.current === "connecting" || stateRef.current === "listening" || stateRef.current === "speaking") {
       return;
     }
@@ -263,6 +289,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
       return;
     }
     closedByUserRef.current = false;
+    openingGreetingRef.current = opening?.greeting.trim().slice(0, 500) ?? "";
     changeState("connecting");
     try {
       const microphone = await navigator.mediaDevices.getUserMedia({
@@ -296,6 +323,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           current_step: details.currentStep,
           companion: details.companion,
           memory_profile_id: cookingMemoryProfileId(),
+          camera_observation: opening?.cameraObservation.trim().slice(0, 320) ?? "",
         }));
       };
       socket.onmessage = (message) => {
@@ -342,5 +370,5 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
 
   useEffect(() => stop, [stop]);
 
-  return { state, start, stop, interrupt, speakProactively, updateStep };
+  return { state, start, stop, interrupt, speakProactively, updateStep, updateObservation };
 }

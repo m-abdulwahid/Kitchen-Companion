@@ -8,7 +8,8 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
-import type { CookingAgentDecision } from "@/lib/cooking-agent-api";
+import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
+import { captureCameraFrame, type CameraFrame } from "@/lib/camera-frame";
 import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import { saveCookingMemory } from "@/lib/memory-api";
 import { ASSISTANT } from "@/lib/assistant";
@@ -40,6 +41,15 @@ function liveLabels(name: string): Record<LiveState, string> {
 }
 
 type EllaMood = "idle" | "talk" | "listen" | "cheer";
+type CameraSeed = { frame: CameraFrame; sessionId: string };
+
+function newCookingSessionId(): string {
+  return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+}
+
+function openingGreeting(observation: string): string {
+  return `I can see ${observation}. Let me know if you want help with what to do next.`;
+}
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,6 +58,9 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [checking, setChecking] = useState(false);
   const [cameraProblem, setCameraProblem] = useState("");
   const [cameraTry, setCameraTry] = useState(0);
+  const [startingHandsFree, setStartingHandsFree] = useState(false);
+  const [cameraSeed, setCameraSeed] = useState<CameraSeed | null>(null);
+  const [voiceQuestionCount, setVoiceQuestionCount] = useState(0);
   const [memoryDraft, setMemoryDraft] = useState("");
   const [memoryStatus, setMemoryStatus] = useState("");
   const [savingMemory, setSavingMemory] = useState(false);
@@ -79,7 +92,13 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       language: language.code,
     },
   });
-  const { state: liveState, start: startLive, stop: stopLive, speakProactively } = useLiveSession({
+  const {
+    state: liveState,
+    start: startLive,
+    stop: stopLive,
+    speakProactively,
+    updateObservation,
+  } = useLiveSession({
     recipeTitle: recipe.title,
     currentStep: step,
     companion: {
@@ -90,11 +109,15 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     },
     onReply: setStatus,
     onError: setStatus,
+    onSpeechStarted: () => setVoiceQuestionCount((count) => count + 1),
   });
   const handsFreeActive =
     liveState === "connecting" || liveState === "listening" || liveState === "speaking";
   const applyCameraDecision = (decision: CookingAgentDecision) => {
-    if (decision.seen && !decision.say) setStatus(`Camera: ${decision.seen}`);
+    if (decision.seen) {
+      updateObservation(decision.seen);
+      if (!decision.say) setStatus(`Camera: ${decision.seen}`);
+    }
     for (const action of decision.actions) {
       if (action.type === "next_step") {
         setStepIndex((current) => Math.min(current + 1, recipe.steps.length - 1));
@@ -115,15 +138,22 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       speakProactively(decision.say);
     }
   };
-  const { isWatching, framesSent, maxFrames } = useCookingAgent({
+  const { isWatching, framesSent, maxFrames, checkNow } = useCookingAgent({
     enabled: liveState === "listening" || liveState === "speaking",
     videoRef,
     recipe,
     stepIndex,
     companion: { name: companion.name, style: companion.style },
+    initialFrame: cameraSeed,
     onDecision: applyCameraDecision,
     onError: setStatus,
   });
+
+  useEffect(() => {
+    // VAD fires at the beginning of a real utterance, leaving a moment for a
+    // current frame to reach the Realtime prompt before the reply is created.
+    if (voiceQuestionCount > 0) void checkNow();
+  }, [checkNow, voiceQuestionCount]);
   const shownMood =
     liveState === "listening" || liveState === "connecting" || voiceState === "recording"
       ? "listen"
@@ -184,6 +214,51 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     } finally {
       setChecking(false);
     }
+  }
+
+  async function enableHandsFree() {
+    const video = videoRef.current;
+    const frame = video ? captureCameraFrame(video) : null;
+    if (!frame) {
+      setStatus("Camera is still warming up. Point it at the food, then try hands-free again.");
+      return;
+    }
+    setStartingHandsFree(true);
+    setStatus("Ella is taking a quick look first…");
+    setEllaMood("listen");
+    const sessionId = newCookingSessionId();
+    try {
+      // This first image is deliberately separate from the live audio socket.
+      // We ignore actions here: an opening glance must never advance a recipe.
+      const decision = await checkCookingFrame(
+        frame.image,
+        sessionId,
+        recipe,
+        stepIndex,
+        { name: companion.name, style: companion.style },
+        cookingMemoryProfileId(),
+      );
+      const observation = decision.seen.trim();
+      if (!observation) {
+        setStatus("Ella needs a clearer look at the food before starting hands-free coaching.");
+        setEllaMood("idle");
+        return;
+      }
+      setCameraSeed({ frame, sessionId });
+      setStatus(`Camera: ${observation}`);
+      interruptLegacySpeech();
+      await startLive({ cameraObservation: observation, greeting: openingGreeting(observation) });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Ella could not check the camera yet. Try again.");
+      setEllaMood("idle");
+    } finally {
+      setStartingHandsFree(false);
+    }
+  }
+
+  function disableHandsFree() {
+    stopLive();
+    setCameraSeed(null);
   }
 
   function nextStep() {
@@ -340,18 +415,17 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              disabled={liveState === "connecting"}
+              disabled={startingHandsFree || liveState === "connecting"}
               onClick={() => {
                 if (liveState === "idle" || liveState === "error") {
-                  interruptLegacySpeech();
-                  void startLive();
-                } else stopLive();
+                  void enableHandsFree();
+                } else disableHandsFree();
               }}
               className="rounded-2xl bg-espresso py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
             >
               {liveState === "listening" || liveState === "speaking"
                 ? "Disable hands-free"
-                : liveLabels(ASSISTANT.name)[liveState]}
+                : startingHandsFree ? "Looking at your kitchen…" : liveLabels(ASSISTANT.name)[liveState]}
             </button>
             {(liveState === "listening" || liveState === "speaking") && (
               <p className="col-span-2 text-center text-xs font-semibold text-caramel">

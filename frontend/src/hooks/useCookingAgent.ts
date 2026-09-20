@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
+import { captureCameraFrame, type CameraFrame } from "@/lib/camera-frame";
 import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 import type { Speaker } from "@/lib/voice-api";
 
-const FRAME_WIDTH = 640;
 const FRAME_INTERVAL_MS = 5_000;
 const MAX_AUTO_FRAMES = 12;
 const CHANGE_THRESHOLD = 9;
@@ -17,39 +17,14 @@ type Options = {
   recipe: Recipe;
   stepIndex: number;
   companion: Pick<Speaker, "name" | "style">;
+  /** The visual check completed immediately before hands-free mode began. */
+  initialFrame?: { frame: CameraFrame; sessionId: string } | null;
   onDecision: (decision: CookingAgentDecision) => void;
   onError: (message: string) => void;
 };
 
-type Frame = { image: string; thumbnail: Uint8Array };
-
 function newSessionId(): string {
   return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
-}
-
-function captureFrame(video: HTMLVideoElement): Frame | null {
-  if (!video.videoWidth || !video.videoHeight) return null;
-  const width = Math.min(FRAME_WIDTH, video.videoWidth);
-  const height = Math.round((width * video.videoHeight) / video.videoWidth);
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) return null;
-  context.drawImage(video, 0, 0, width, height);
-
-  const tiny = document.createElement("canvas");
-  tiny.width = 32;
-  tiny.height = 24;
-  const tinyContext = tiny.getContext("2d", { willReadFrequently: true });
-  if (!tinyContext) return null;
-  tinyContext.drawImage(canvas, 0, 0, tiny.width, tiny.height);
-  const pixels = tinyContext.getImageData(0, 0, tiny.width, tiny.height).data;
-  const thumbnail = new Uint8Array(tiny.width * tiny.height);
-  for (let index = 0; index < thumbnail.length; index += 1) {
-    thumbnail[index] = (pixels[index * 4] + pixels[index * 4 + 1] + pixels[index * 4 + 2]) / 3;
-  }
-  return { image: canvas.toDataURL("image/jpeg", 0.6), thumbnail };
 }
 
 function imageDifference(current: Uint8Array, previous: Uint8Array): number {
@@ -87,17 +62,17 @@ export function useCookingAgent(options: Options) {
     busyRef.current = false;
   }, []);
 
-  const checkFrame = useCallback(async () => {
+  const checkFrame = useCallback(async (force = false) => {
     const current = optionsRef.current;
     if (!current.enabled || haltedRef.current || busyRef.current) return;
     const video = current.videoRef.current;
     if (!video) return;
-    const frame = captureFrame(video);
+    const frame = captureCameraFrame(video);
     if (!frame) return;
-    if (
+    if (!force && (
       lastThumbnailRef.current &&
       imageDifference(frame.thumbnail, lastThumbnailRef.current) < CHANGE_THRESHOLD
-    ) return;
+    )) return;
     if (sentRef.current >= MAX_AUTO_FRAMES) {
       haltedRef.current = true;
       stopWatching();
@@ -134,6 +109,9 @@ export function useCookingAgent(options: Options) {
     }
   }, [stopWatching]);
 
+  /** Use one current frame when the cook begins a spoken question. */
+  const checkNow = useCallback(() => checkFrame(true), [checkFrame]);
+
   useEffect(() => {
     if (!options.enabled) {
       haltedRef.current = false;
@@ -143,14 +121,24 @@ export function useCookingAgent(options: Options) {
       return;
     }
     haltedRef.current = false;
-    void checkFrame();
+    const seed = optionsRef.current.initialFrame;
+    if (seed) {
+      // The first vision request was already made before live audio was opened.
+      // Count it and seed change detection so it is never paid for twice.
+      sessionIdRef.current = seed.sessionId;
+      lastThumbnailRef.current = seed.frame.thumbnail;
+      sentRef.current = 1;
+    } else {
+      void checkFrame();
+    }
     intervalRef.current = window.setInterval(() => void checkFrame(), FRAME_INTERVAL_MS);
     return stopWatching;
   }, [checkFrame, options.enabled, stopWatching]);
 
   return {
-    isWatching: options.enabled && framesSent < MAX_AUTO_FRAMES,
-    framesSent,
+    isWatching: options.enabled && Math.max(framesSent, options.initialFrame ? 1 : 0) < MAX_AUTO_FRAMES,
+    framesSent: options.enabled ? Math.max(framesSent, options.initialFrame ? 1 : 0) : 0,
     maxFrames: MAX_AUTO_FRAMES,
+    checkNow,
   };
 }
