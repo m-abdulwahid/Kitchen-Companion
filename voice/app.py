@@ -5,6 +5,7 @@ returns Omni's answer as text plus spoken audio (see docs/omni-voice.md for how 
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import hmac
 import io
@@ -88,6 +89,8 @@ SPEAK_PROMPT = (
 )
 MAX_SPEAK_CHARS = 600
 SPEAK_CACHE_SIZE = 200
+RETRYABLE_OMNI_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504})
+OMNI_RETRY_DELAY_SECONDS = 0.4
 
 # Languages the app offers. The voices support 29 (see voices.json); to add one, add a line here
 # and in frontend/src/lib/languages.ts. English is the source language: no translation step.
@@ -661,7 +664,21 @@ async def ask_omni_chat(messages: list[dict], purpose: str) -> tuple[str, dict]:
         span.set_data("ai.model", MODEL)
         try:
             async with httpx.AsyncClient(timeout=60.0, trust_env=False) as client:
-                response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json=payload)
+                for attempt in range(2):
+                    response = await client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json=payload)
+                    elapsed = time.monotonic() - started
+                    span.set_data("http.response.status_code", response.status_code)
+                    if response.status_code == 200:
+                        break
+                    append_audit_record(**audit, ok=False, status_code=response.status_code,
+                                        latency_s=elapsed, error=response.text)
+                    if response.status_code in RETRYABLE_OMNI_STATUS_CODES and attempt == 0:
+                        # The provider returned no usage for these gateway failures. One
+                        # short retry makes camera startup resilient without a retry loop.
+                        span.set_data("ai.retry.count", 1)
+                        await asyncio.sleep(OMNI_RETRY_DELAY_SECONDS)
+                        continue
+                    raise HTTPException(status_code=502, detail="Omni is temporarily unavailable. Please try again shortly.")
         except httpx.HTTPError as exc:
             span.set_data("error.type", type(exc).__name__)
             append_audit_record(**audit, ok=False, latency_s=time.monotonic() - started,
@@ -669,9 +686,6 @@ async def ask_omni_chat(messages: list[dict], purpose: str) -> tuple[str, dict]:
             raise HTTPException(status_code=502, detail=f"Omni request failed: {exc}")
         elapsed = time.monotonic() - started
         span.set_data("http.response.status_code", response.status_code)
-        if response.status_code != 200:
-            append_audit_record(**audit, ok=False, status_code=response.status_code, latency_s=elapsed, error=response.text)
-            raise HTTPException(status_code=502, detail=f"Omni {response.status_code}: {response.text}")
         body = response.json()
         append_audit_record(**audit, ok=True, status_code=200, latency_s=elapsed, response_json=body)
         try:

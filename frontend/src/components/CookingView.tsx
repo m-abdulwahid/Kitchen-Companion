@@ -211,9 +211,16 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
         cameraObservation: "",
         greeting: "I'm ready. Point the camera at the pan whenever you want visual help.",
       });
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Ella could not check the camera yet. Try again.");
-      setEllaMood("idle");
+    } catch {
+      // A one-off provider failure must not prevent cooking. Once live voice is
+      // connected, the normal camera loop can quietly try again on its next
+      // changed frame.
+      setStatus("Ella's camera check had a brief hiccup. She's ready to help by voice.");
+      setEllaMood("listen");
+      await startLive({
+        cameraObservation: "",
+        greeting: "I'm ready to help. Point the camera at the pan whenever you want visual help.",
+      });
     } finally {
       setStartingHandsFree(false);
     }

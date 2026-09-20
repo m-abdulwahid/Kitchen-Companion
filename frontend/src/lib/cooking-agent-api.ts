@@ -61,6 +61,9 @@ export async function checkCookingFrame(
     span?.setAttribute("http.response.status_code", response.status);
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { detail?: string };
+      if (response.status >= 500) {
+        throw new Error("Ella's camera check is temporarily unavailable. She'll keep trying shortly.");
+      }
       throw new Error(body.detail || `Cooking agent error ${response.status}`);
     }
     const data = (await response.json()) as AgentResponse;
