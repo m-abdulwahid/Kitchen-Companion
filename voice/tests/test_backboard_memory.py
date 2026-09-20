@@ -22,6 +22,8 @@ class MemoryCommandTests(unittest.TestCase):
                          memory.MemoryCommand("remember", "I have a peanut allergy"))
         self.assertEqual(memory.extract_memory_command("I have a peanut allergy, please remember."),
                          memory.MemoryCommand("remember", "I have a peanut allergy"))
+        self.assertEqual(memory.extract_memory_command("Ella, remember that I do not like bananas."),
+                         memory.MemoryCommand("remember", "I do not like bananas"))
         self.assertIsNone(memory.extract_memory_command("I am allergic to peanuts"))
         self.assertIsNone(memory.extract_memory_command("Do you remember that I am allergic to peanuts?"))
         self.assertIsNone(memory.extract_memory_command("remember"))

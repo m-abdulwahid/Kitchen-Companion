@@ -186,6 +186,8 @@ def build_system_prompt(context: CookingContext) -> str:
         "unless the cook explicitly asks what to do next, asks for a repeat, or asks for directions. "
         "Prioritize the latest verified camera observation when answering what the cook is doing or what they should do now. "
         "Never invent a visual detail that is not in that observation. "
+        "When a remembered food preference is relevant to the recipe, mention it before suggesting an ingredient or step; "
+        "do not treat it as a restriction for anyone else. "
         f"Your personality: {context.companion_style} "
         f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}. "
         f"{observation_instruction}"
@@ -332,7 +334,10 @@ async def with_live_memory(context: CookingContext, profile_id: str) -> CookingC
     """Recall a few explicit preferences without making Backboard availability a live-voice dependency."""
     if not profile_id or not LIVE_MEMORY.enabled:
         return context
-    query = f"{context.recipe_title} {context.current_step} allergies dietary preferences substitutions"
+    query = (
+        f"{context.recipe_title} {context.current_step} allergies dietary needs ingredient dislikes "
+        "favorite foods spice level cooking preferences substitutions"
+    )
     try:
         remembered = await LIVE_MEMORY.recall(profile_id, query)
     except (httpx.HTTPError, RuntimeError, ValueError):

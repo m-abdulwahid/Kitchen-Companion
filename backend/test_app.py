@@ -44,6 +44,7 @@ class FakeMemory:
 
     def __init__(self) -> None:
         self.remembered: list[tuple[str, str]] = []
+        self.queries: list[str] = []
 
     async def remember(self, profile_id: str, fact: str) -> bool:
         self.remembered.append((profile_id, fact))
@@ -53,6 +54,7 @@ class FakeMemory:
         return False
 
     async def recall(self, profile_id: str, query: str) -> list[str]:
+        self.queries.append(query)
         return ["allergic to peanuts"]
 
 
@@ -106,6 +108,16 @@ class RealtimeRelayTests(unittest.TestCase):
         })
         self.assertIn("allergic to peanuts", build_system_prompt(context))
 
+    def test_live_prompt_applies_a_relevant_food_preference(self) -> None:
+        context = CookingContext.from_message({
+            "recipe_title": "Banana Pancakes",
+            "current_step": "Mash the banana.",
+            "memory_hint": "Explicit cooking preferences from this browser: I do not like bananas",
+        })
+        prompt = build_system_prompt(context)
+        self.assertIn("I do not like bananas", prompt)
+        self.assertIn("remembered food preference", prompt)
+
     def test_live_prompt_prioritizes_camera_over_recipe_narration(self) -> None:
         prompt = build_system_prompt(self.context)
         self.assertIn("Treat the recipe as background reference, not a script", prompt)
@@ -149,6 +161,7 @@ class RealtimeRelayTests(unittest.TestCase):
                 client, upstream, state, "Please remember that I am allergic to peanuts.",
             ))
         self.assertEqual(memory.remembered, [("cook_12345678", "I am allergic to peanuts")])
+        self.assertIn("ingredient dislikes", memory.queries[0])
         self.assertIn("allergic to peanuts", state.context.memory)
         self.assertEqual(upstream.sent[0]["type"], "session.update")
         self.assertEqual(client.events, [{
