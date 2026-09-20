@@ -41,8 +41,9 @@ but the cooking, camera, and live voice flows continue normally.
 
 ## Privacy boundary
 
-Memory is opt-in: the app does not infer or save allergies, dietary choices,
-food likes/dislikes (for example, “I do not like bananas”), or other personal
-facts from a camera image or casual conversation. Voice writes
-require the unambiguous `remember` or `forget` command and stay isolated to the
-same anonymous browser profile.
+Memory stays scoped to the kitchen. A clear first-person food taste such as “I
+hate bananas” is saved as a cooking preference, so Ella can avoid suggesting
+that ingredient next time. Allergies, dietary choices, and other potentially
+sensitive facts are never inferred from a camera image or casual conversation:
+they still require an unambiguous `remember` or `forget` command. All memories
+stay isolated to the same anonymous browser profile.

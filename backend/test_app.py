@@ -172,6 +172,15 @@ class RealtimeRelayTests(unittest.TestCase):
             "changed": True,
         }])
 
+    def test_clear_food_taste_is_saved_without_a_special_command(self) -> None:
+        memory = FakeMemory()
+        client = FakeClient()
+        upstream = FakeUpstream([])
+        state = RelayState(self.context, memory_profile_id="cook_12345678")
+        with patch("backend.app.LIVE_MEMORY", memory):
+            asyncio.run(persist_voice_memory(client, upstream, state, "I hate bananas."))
+        self.assertEqual(memory.remembered, [("cook_12345678", "I hate bananas")])
+
 
 if __name__ == "__main__":
     unittest.main()

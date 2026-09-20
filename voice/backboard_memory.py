@@ -3,7 +3,8 @@
 The cooking agent continues to work when BACKBOARD_API_KEY is absent or
 Backboard is temporarily unavailable. A browser profile receives its own
 Backboard assistant, rather than putting every cook's facts in one shared
-memory bank. We only write a fact when the cook explicitly says "remember".
+memory bank. Clear first-person food likes and dislikes are saved as cooking
+preferences; allergies and other sensitive facts still require "remember".
 """
 from __future__ import annotations
 
@@ -68,6 +69,31 @@ def extract_memory_command(text: object) -> MemoryCommand | None:
     if len(fact) < 3:
         return None
     return MemoryCommand(action=action, fact=fact)
+
+
+def extract_food_preference(text: object) -> MemoryCommand | None:
+    """Recognize a direct food taste, but never infer a medical/dietary fact.
+
+    A cook saying “I hate bananas” is an unambiguous, useful cooking
+    preference. Allergies, intolerances, diets, and faith/health restrictions
+    remain explicit-only, even when a spoken sentence resembles a preference.
+    """
+    spoken = clean_text(text, MAX_FACT_CHARS + 40)
+    prefix = r"(?:(?:ella|whisk[- ]ella|remy)[,:]?\s+)?"
+    match = re.match(
+        rf"(?i)^{prefix}i\s+(?:(?:really|just)\s+)?"
+        r"(hate|dislike|love|enjoy|prefer|(?:do\s+not|don['’]?t)\s+like)\s+(.+?)[.!?]*$",
+        spoken,
+    )
+    if not match:
+        return None
+    fact = clean_text(f"I {match.group(1)} {match.group(2)}", MAX_FACT_CHARS)
+    if len(fact) < 6 or re.search(
+        r"(?i)\b(allerg|intoleran|medical|doctor|diet|vegan|vegetarian|gluten|celiac|kosher|halal)\b",
+        fact,
+    ):
+        return None
+    return MemoryCommand(action="remember", fact=fact)
 
 
 def assistant_name(profile_id: str) -> str:

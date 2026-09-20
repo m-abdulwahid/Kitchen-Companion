@@ -28,6 +28,16 @@ class MemoryCommandTests(unittest.TestCase):
         self.assertIsNone(memory.extract_memory_command("Do you remember that I am allergic to peanuts?"))
         self.assertIsNone(memory.extract_memory_command("remember"))
 
+    def test_clear_food_tastes_are_saved_but_sensitive_statements_are_not_inferred(self):
+        self.assertEqual(memory.extract_food_preference("I hate bananas."),
+                         memory.MemoryCommand("remember", "I hate bananas"))
+        self.assertEqual(memory.extract_food_preference("Ella, I don't like cilantro."),
+                         memory.MemoryCommand("remember", "I don't like cilantro"))
+        self.assertEqual(memory.extract_food_preference("I really love spicy noodles."),
+                         memory.MemoryCommand("remember", "I love spicy noodles"))
+        self.assertIsNone(memory.extract_food_preference("I am allergic to peanuts"))
+        self.assertIsNone(memory.extract_food_preference("I don't like gluten"))
+
     def test_profile_ids_are_random_id_shapes_not_names(self):
         self.assertEqual(memory.valid_profile_id("a3c1b4d5-1111-2222-3333-123456789abc"),
                          "a3c1b4d5-1111-2222-3333-123456789abc")

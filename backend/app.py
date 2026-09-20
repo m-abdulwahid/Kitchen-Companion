@@ -27,7 +27,13 @@ import httpx
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from voice.backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
+from voice.backboard_memory import (
+    BackboardMemory,
+    extract_food_preference,
+    extract_memory_command,
+    memory_context,
+    valid_profile_id,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -352,8 +358,8 @@ async def with_live_memory(context: CookingContext, profile_id: str) -> CookingC
 async def persist_voice_memory(
     client: WebSocket, upstream: UpstreamSocket, state: RelayState, transcript: str,
 ) -> None:
-    """Persist only an explicit spoken command and refresh the live prompt afterwards."""
-    command = extract_memory_command(transcript)
+    """Persist explicit facts and clear first-person food tastes from live speech."""
+    command = extract_memory_command(transcript) or extract_food_preference(transcript)
     if not command or not state.memory_profile_id:
         return
     command_key = (command.action, command.fact.casefold())

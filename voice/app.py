@@ -28,13 +28,13 @@ from pydantic import BaseModel
 
 try:  # package import: `.venv/bin/uvicorn voice.app:app` from the repository root
     from . import agent as agent_brain
-    from .backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
+    from .backboard_memory import BackboardMemory, extract_food_preference, extract_memory_command, memory_context, valid_profile_id
     from . import usage as usage_data
     from . import vision as vision_data
     from .yibu_audit import append_audit_record, normalize_usage
 except ImportError:  # script import: `cd voice && ../.venv/bin/uvicorn app:app`
     import agent as agent_brain
-    from backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
+    from backboard_memory import BackboardMemory, extract_food_preference, extract_memory_command, memory_context, valid_profile_id
     import usage as usage_data
     import vision as vision_data
     from yibu_audit import append_audit_record, normalize_usage
@@ -778,7 +778,7 @@ async def agent_turn(request: AgentTurnRequest):
     decision = agent_brain.decide(event=event, raw=raw, session=session, step_index=step_index,
                                   n_steps=len(steps), timers=timers, auto_advance=request.auto_advance,
                                   has_image=bool(image))
-    command = extract_memory_command(decision["heard"])
+    command = extract_memory_command(decision["heard"]) or extract_food_preference(decision["heard"])
     if memory_profile_id and command:
         try:
             if command.action == "remember":

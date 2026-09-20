@@ -47,10 +47,11 @@ recipe context, `{"type":"interrupt"}` to cancel a spoken reply, or
 Provider events, including `response.audio.delta`, are relayed to the browser unchanged.
 
 When `BACKBOARD_API_KEY` is configured, the optional `memory_profile_id` is
-used only to retrieve that browser's explicit cooking preferences before the
-Realtime session starts. A spoken phrase beginning with `remember` or `forget`
-is saved or removed, then the live prompt is refreshed. The relay sends a
-`relay.memory` event to confirm the outcome; it never persists casual speech.
+used only to retrieve that browser's cooking preferences before the Realtime
+session starts. A spoken `remember`/`forget` request is saved or removed, and a
+clear first-person food taste such as “I hate bananas” is saved as a preference.
+Allergies, diets, and other sensitive facts remain explicit-only. The relay
+sends a `relay.memory` event to confirm the outcome.
 
 ## Config
 
