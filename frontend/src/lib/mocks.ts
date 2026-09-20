@@ -31,6 +31,7 @@ export async function generateRecipeFromVideo(url: string): Promise<Recipe> {
     cost: "$9–13",
     servings: 2,
     diets: isTiktok ? ["halal", "vegetarian"] : ["halal", "vegetarian", "vegan", "gluten-free"],
+    meal: isTiktok ? "dinner" : "lunch",
     ingredients: isTiktok
       ? ["spaghetti", "garlic", "olive oil", "chili flakes", "parsley", "salt"]
       : ["greens", "cucumber", "tomato", "lemon", "olive oil", "salt"],

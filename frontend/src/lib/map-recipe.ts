@@ -1,5 +1,5 @@
 import { photoForRecipe } from "./food-photos";
-import type { DietTag, Recipe, RecipeSource } from "./types";
+import type { DietTag, Meal, Recipe, RecipeSource } from "./types";
 
 const DIET_MAP: Record<string, DietTag> = {
   halal: "halal",
@@ -66,6 +66,15 @@ function emojiFor(cuisine?: string, mealType?: string) {
   return "🍽️";
 }
 
+export function inferMeal(title: string, mealType?: string): Meal {
+  const key = `${mealType ?? ""} ${title}`.toLowerCase();
+  if (/(breakfast|oat|pancake|waffle|egg|granola)/.test(key)) return "breakfast";
+  if (/(snack|toast|hummus|chip|cookie|yogurt|parfait)/.test(key)) return "snack";
+  if (/(lunch|sandwich|wrap|salad|ramen|quesadilla)/.test(key)) return "lunch";
+  if (/(dinner|pasta|rice|chicken|steak|soup)/.test(key)) return "dinner";
+  return "dinner";
+}
+
 export async function mapApiRecipe(raw: ApiRecipe): Promise<Recipe> {
   const title = raw.name?.trim() || raw.title?.trim() || "Untitled recipe";
   const timeMinutes = Math.max(5, (raw.prep_time ?? 0) + (raw.cook_time ?? 20));
@@ -83,6 +92,7 @@ export async function mapApiRecipe(raw: ApiRecipe): Promise<Recipe> {
     cost: COST_BY_DIFFICULTY[raw.difficulty ?? ""] ?? "$10–16",
     servings: raw.servings ?? 2,
     diets: mapDiets(raw.dietary_tags),
+    meal: inferMeal(title, raw.meal_type),
     ingredients: (raw.ingredients ?? []).map(formatIngredient).filter(Boolean),
     steps: (raw.instructions ?? []).map((step) => step.trim()).filter(Boolean),
     source: "api",

@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ASSISTANT } from "@/lib/assistant";
+import { createPortal } from "react-dom";
+import { BrandMark } from "@/components/BrandMark";
+import { ASSISTANT, PROJECT } from "@/lib/assistant";
 
 const courses = [
   {
@@ -29,6 +31,11 @@ const courses = [
 export function AppNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     setOpen(false);
@@ -40,6 +47,77 @@ export function AppNav() {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  const menu = open ? (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8">
+      <button
+        type="button"
+        aria-label="Close menu"
+        onClick={() => setOpen(false)}
+        className="absolute inset-0 bg-espresso/50"
+      />
+      <aside className="menu-paper relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[2rem] border border-peach bg-[#fffaf2] px-6 py-6 shadow-[0_24px_60px_rgba(61,36,24,0.28)]">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-caramel"
+        >
+          Close
+        </button>
+        <div className="text-center">
+          <div className="mx-auto w-fit">
+            <BrandMark
+              src="/brand/whisk-ella-logo.png"
+              alt="Whiskers logo"
+              className="h-16 w-16"
+            />
+          </div>
+          <p className="mt-2 font-display text-3xl text-espresso">{PROJECT.name}</p>
+          <svg viewBox="0 0 260 56" className="mx-auto h-12 w-56">
+            <path id="whisk-arc" d="M18 48 Q130 0 242 48" fill="none" />
+            <text
+              fill="#c4784a"
+              fontFamily="var(--font-fredoka), Fredoka, sans-serif"
+              fontSize="22"
+            >
+              <textPath href="#whisk-arc" startOffset="50%" textAnchor="middle">
+                with {ASSISTANT.brand}
+              </textPath>
+            </text>
+          </svg>
+          <p className="font-display text-sm tracking-[0.35em] text-caramel uppercase">
+            tonight&apos;s menu
+          </p>
+        </div>
+
+        <nav className="mt-6 space-y-4">
+          {courses.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`block rounded-2xl border border-dashed border-caramel/30 px-4 py-3 ${
+                  active ? "bg-peach/70" : "bg-white/50 hover:bg-peach/40"
+                }`}
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-caramel">
+                  {item.course}
+                </p>
+                <div className="mt-1 flex items-baseline justify-between gap-3 border-b border-dotted border-caramel/50 pb-1">
+                  <span className="font-display text-2xl text-espresso">
+                    {item.label}
+                  </span>
+                  <span className="text-xs text-caramel">• • •</span>
+                </div>
+                <p className="mt-1 text-sm text-cocoa/75">{item.note}</p>
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    </div>
+  ) : null;
 
   return (
     <header className="sticky top-0 z-30 border-b border-peach/80 bg-cream/90 backdrop-blur">
@@ -56,92 +134,16 @@ export function AppNav() {
             <span className="block h-0.5 w-3 rounded-full bg-espresso" />
           </span>
         </button>
-        <Link href="/" className="flex items-center gap-2">
-          <img
-            src="/brand/whisk-ella-logo.png"
-            alt="Whisk-Ella"
-            className="h-10 w-10 object-contain"
-          />
-          <p className="font-display text-xl text-espresso">{ASSISTANT.brand}</p>
+        <BrandMark
+          src="/brand/whisk-ella-logo.png"
+          alt="Whiskers logo"
+          className="h-10 w-10"
+        />
+        <Link href="/" className="font-display text-xl text-espresso">
+          {PROJECT.name}
         </Link>
       </div>
-
-      {open ? (
-        <button
-          type="button"
-          aria-label="Close menu"
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-40 bg-espresso/35"
-        />
-      ) : null}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-[min(22rem,92vw)] transform overflow-y-auto border-r border-peach bg-[#fffaf2] shadow-[12px_0_40px_rgba(61,36,24,0.18)] transition-transform duration-300 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="menu-paper px-5 pb-8 pt-6">
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-caramel"
-          >
-            Close
-          </button>
-          <div className="text-center">
-            <img
-              src="/brand/whisk-ella-logo.png"
-              alt="Whisk-Ella"
-              className="mx-auto h-16 w-16 object-contain"
-            />
-            <svg viewBox="0 0 260 72" className="mx-auto mt-1 h-16 w-56">
-              <path
-                id="whisk-arc"
-                d="M18 58 Q130 -6 242 58"
-                fill="none"
-              />
-              <text
-                fill="#3d2418"
-                fontFamily="var(--font-fredoka), Fredoka, sans-serif"
-                fontSize="28"
-              >
-                <textPath href="#whisk-arc" startOffset="50%" textAnchor="middle">
-                  Whisk-Ella
-                </textPath>
-              </text>
-            </svg>
-            <p className="font-display text-sm tracking-[0.35em] text-caramel uppercase">
-              tonight&apos;s menu
-            </p>
-          </div>
-
-          <nav className="mt-8 space-y-5">
-            {courses.map((item) => {
-              const active = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block rounded-2xl border border-dashed border-caramel/30 px-4 py-3 ${
-                    active ? "bg-peach/70" : "bg-white/50 hover:bg-peach/40"
-                  }`}
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-caramel">
-                    {item.course}
-                  </p>
-                  <div className="mt-1 flex items-baseline justify-between gap-3 border-b border-dotted border-caramel/50 pb-1">
-                    <span className="font-display text-2xl text-espresso">
-                      {item.label}
-                    </span>
-                    <span className="text-xs text-caramel">• • •</span>
-                  </div>
-                  <p className="mt-1 text-sm text-cocoa/75">{item.note}</p>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      </aside>
+      {mounted ? createPortal(menu, document.body) : null}
     </header>
   );
 }

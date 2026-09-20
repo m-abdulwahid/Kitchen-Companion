@@ -2,7 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { RecipeGrid } from "@/components/RecipeGrid";
-import { filterAndSortRecipes, type RecipeSort } from "@/lib/recipe-search";
+import { filterAndSortRecipes, type MealFilter } from "@/lib/recipe-search";
 import type { DietTag, Recipe } from "@/lib/types";
 
 const DIETS: { id: DietTag; label: string }[] = [
@@ -12,10 +12,12 @@ const DIETS: { id: DietTag; label: string }[] = [
   { id: "gluten-free", label: "Gluten free" },
 ];
 
-const SORTS: { id: RecipeSort; label: string }[] = [
-  { id: "relevance", label: "Best match" },
-  { id: "time", label: "Time to cook" },
-  { id: "cost", label: "Estimated cost" },
+const MEALS: { id: MealFilter; label: string }[] = [
+  { id: "all", label: "All meals" },
+  { id: "breakfast", label: "Breakfast" },
+  { id: "snack", label: "Snacks" },
+  { id: "lunch", label: "Lunch" },
+  { id: "dinner", label: "Dinner" },
 ];
 
 type RecipeBrowserProps = {
@@ -37,11 +39,11 @@ export function RecipeBrowser({
 }: RecipeBrowserProps) {
   const [query, setQuery] = useState("");
   const [diets, setDiets] = useState<DietTag[]>([]);
-  const [sort, setSort] = useState<RecipeSort>("relevance");
+  const [meal, setMeal] = useState<MealFilter>("all");
 
   const shown = useMemo(
-    () => filterAndSortRecipes(recipes, query, diets, sort),
-    [diets, query, recipes, sort],
+    () => filterAndSortRecipes(recipes, query, diets, meal),
+    [diets, meal, query, recipes],
   );
 
   function toggleDiet(diet: DietTag) {
@@ -69,6 +71,25 @@ export function RecipeBrowser({
           />
         </label>
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          {MEALS.map((option) => {
+            const on = meal === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setMeal(option.id)}
+                className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                  on
+                    ? "bg-espresso text-cream"
+                    : "bg-cream text-cocoa ring-1 ring-peach hover:bg-peach"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {DIETS.map((diet) => {
             const on = diets.includes(diet.id);
             return (
@@ -86,20 +107,6 @@ export function RecipeBrowser({
               </button>
             );
           })}
-          <label className="ml-auto flex items-center gap-2 text-sm font-semibold text-cocoa">
-            Sort
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as RecipeSort)}
-              className="rounded-full border border-peach bg-cream px-3 py-1.5 text-sm font-semibold text-espresso"
-            >
-              {SORTS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
         </div>
       </div>
       <RecipeGrid

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recipeSourceFromUrl } from "@/lib/map-recipe";
+import { inferMeal, recipeSourceFromUrl } from "@/lib/map-recipe";
 import { loadRootEnv } from "@/lib/server-env";
 import type { Recipe } from "@/lib/types";
 
@@ -125,6 +125,7 @@ function recipeFromJsonLd(raw: string, url: string): Recipe | null {
       cost: "$10–16",
       servings: Number.parseInt(String(recipe.recipeYield ?? "2"), 10) || 2,
       diets: [],
+      meal: inferMeal(title),
       ingredients: ingredients.length ? ingredients : ["See the original page for amounts."],
       steps: steps.length ? steps : ["Follow the method on the original page."],
       source: "web",
@@ -231,6 +232,7 @@ function stubFromMeta(url: string, meta: VideoMeta): Recipe {
     cost: "$10–16",
     servings: 2,
     diets: [],
+    meal: inferMeal(tidyTitle(meta.title)),
     ingredients: ["Ingredients from the video — check CookingGuru if this list is thin."],
     steps: [
       "Set out everything you saw in the clip.",
@@ -296,6 +298,7 @@ async function generateWithOmni(url: string, meta: VideoMeta | null): Promise<Re
       cost: "$10–16",
       servings: Number(json.servings) || 2,
       diets: [],
+      meal: inferMeal(String(json.title ?? tidyTitle(meta.title))),
       ingredients,
       steps,
       source: recipeSourceFromUrl(url),

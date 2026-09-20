@@ -66,7 +66,7 @@ export function RecipeOverflowMenu({
         {open ? (
           <div
             role="menu"
-            className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl bg-white py-2 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
+            className="absolute right-0 mt-2 w-64 overflow-visible rounded-2xl bg-white py-2 text-sm shadow-[0_12px_32px_rgba(107,63,42,0.16)] ring-1 ring-peach/70"
           >
             <button
               type="button"

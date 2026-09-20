@@ -1,7 +1,6 @@
-import { costLow } from "./ingredients";
-import type { DietTag, Recipe } from "./types";
+import type { DietTag, Meal, Recipe } from "./types";
 
-export type RecipeSort = "relevance" | "time" | "cost";
+export type MealFilter = "all" | Meal;
 
 function tokens(value: string) {
   return value
@@ -35,16 +34,15 @@ export function filterAndSortRecipes(
   recipes: Recipe[],
   query: string,
   diets: DietTag[],
-  sort: RecipeSort,
+  meal: MealFilter,
 ): Recipe[] {
   const scored = recipes
     .filter((recipe) => diets.every((diet) => recipe.diets.includes(diet)))
+    .filter((recipe) => meal === "all" || recipe.meal === meal)
     .map((recipe) => ({ recipe, score: scoreRecipe(recipe, query) }))
     .filter((entry) => entry.score > 0);
 
   scored.sort((a, b) => {
-    if (sort === "time") return a.recipe.timeMinutes - b.recipe.timeMinutes;
-    if (sort === "cost") return costLow(a.recipe.cost) - costLow(b.recipe.cost);
     if (b.score !== a.score) return b.score - a.score;
     return a.recipe.timeMinutes - b.recipe.timeMinutes;
   });

@@ -1,3 +1,7 @@
+export const PROJECT = {
+  name: "Whiskers",
+} as const;
+
 export const ASSISTANT = {
   brand: "Whisk-Ella",
   name: "Ella",

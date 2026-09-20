@@ -13,6 +13,7 @@ export const RECIPES: Recipe[] = [
     cost: "$3–5",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "lunch",
     ingredients: [
       "2 slices|sandwich bread",
       "2 tsp|butter",
@@ -39,6 +40,7 @@ export const RECIPES: Recipe[] = [
     cost: "$4–6",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "lunch",
     ingredients: [
       "1|flour tortilla",
       "1/2 cup|shredded cheese",
@@ -65,6 +67,7 @@ export const RECIPES: Recipe[] = [
     cost: "$3–5",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "breakfast",
     ingredients: [
       "2|eggs",
       "1 tsp|butter",
@@ -86,11 +89,12 @@ export const RECIPES: Recipe[] = [
       "Microwave oats, a banana, and a spoon of peanut butter. Filling, cheap, and ready before the kettle cools.",
     emoji: "🥣",
     imageUrl:
-      "https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1645466525466-647ef246067f?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 5,
     cost: "$2–4",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "breakfast",
     ingredients: [
       "1/2 cup|rolled oats",
       "1 cup|water or milk",
@@ -117,6 +121,7 @@ export const RECIPES: Recipe[] = [
     cost: "$4–7",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "dinner",
     ingredients: [
       "4 oz|spaghetti",
       "2 tbsp|butter",
@@ -144,6 +149,7 @@ export const RECIPES: Recipe[] = [
     cost: "$5–8",
     servings: 1,
     diets: ["halal", "vegetarian", "vegan"],
+    meal: "lunch",
     ingredients: [
       "1/2 cup|canned chickpeas, rinsed",
       "1 tbsp|olive oil or tahini",
@@ -172,6 +178,7 @@ export const RECIPES: Recipe[] = [
     cost: "$4–7",
     servings: 2,
     diets: ["halal", "vegetarian", "vegan", "gluten-free"],
+    meal: "dinner",
     ingredients: [
       "1 cup|cooked rice (or 1/2 cup dry)",
       "1 can|black or pinto beans, rinsed",
@@ -200,6 +207,7 @@ export const RECIPES: Recipe[] = [
     cost: "$3–6",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "lunch",
     ingredients: [
       "1 pkg|instant ramen",
       "1|egg",
@@ -216,6 +224,34 @@ export const RECIPES: Recipe[] = [
     source: "kitchen",
   },
   {
+    id: "indomie-instant-noodles",
+    title: "Indomie Instant Noodles",
+    description:
+      "A cup (or packet) of Indomie. Boil, mix the seasoning, eat. The classic dorm lunch.",
+    emoji: "🍜",
+    imageUrl:
+      "https://images.unsplash.com/photo-1684707878393-02606f779d7f?auto=format&fit=crop&w=1200&q=80",
+    timeMinutes: 5,
+    cost: "$1–3",
+    servings: 1,
+    diets: ["halal"],
+    meal: "lunch",
+    ingredients: [
+      "1 pack|Indomie instant noodles (Mi Goreng or cup)",
+      "2 cups|water",
+      "1|egg (optional)",
+      "1|green onion, sliced (optional)",
+    ],
+    steps: [
+      "Bring 2 cups water to a boil over high heat. If you have the cup, boil a kettle instead.",
+      "Add the Indomie noodles. Cook 3 minutes on medium-high until just soft. For the cup, pour boiling water to the line and cover 3 minutes.",
+      "Drain most of the water, leaving about 2 tablespoons so the seasoning clings. Cup noodles: do not drain.",
+      "Stir in every packet — seasoning powder, chili, kecap, and the oil. Mix until the noodles look glossy.",
+      "Crack in an egg while the noodles are still hot if you want it richer. Green onion on top. Lunch is served.",
+    ],
+    source: "kitchen",
+  },
+  {
     id: "yogurt-berry-bowl",
     title: "Yogurt Berry Crunch Bowl",
     description:
@@ -227,6 +263,7 @@ export const RECIPES: Recipe[] = [
     cost: "$3–6",
     servings: 1,
     diets: ["halal", "vegetarian", "gluten-free"],
+    meal: "snack",
     ingredients: [
       "1 cup|plain yogurt",
       "1/2 cup|frozen or fresh berries",
@@ -252,6 +289,7 @@ export const RECIPES: Recipe[] = [
     cost: "$6–9",
     servings: 2,
     diets: ["halal", "vegetarian", "vegan"],
+    meal: "lunch",
     ingredients: [
       "1 cup|orzo",
       "1 can|chickpeas, rinsed",
@@ -281,6 +319,7 @@ export const RECIPES: Recipe[] = [
     cost: "$9–13",
     servings: 2,
     diets: ["halal", "gluten-free"],
+    meal: "dinner",
     ingredients: [
       "2|chicken thighs",
       "2|potatoes, cubed",
@@ -308,6 +347,7 @@ export const RECIPES: Recipe[] = [
     cost: "$4–7",
     servings: 1,
     diets: ["halal", "vegetarian"],
+    meal: "dinner",
     ingredients: [
       "1 1/2 cups|cold cooked rice",
       "1|egg",
@@ -321,6 +361,32 @@ export const RECIPES: Recipe[] = [
       "Add 1/2 cup frozen veg. Stir 2 minutes until hot.",
       "Push veg aside. Scramble 1 egg on medium-high, then mix it in.",
       "Add 1 1/2 cups cold rice and 1 tablespoon soy sauce. Stir-fry 3 minutes until some grains toast. Serve hot.",
+    ],
+    source: "kitchen",
+  },
+  {
+    id: "hummus-pita-snack",
+    title: "Hummus & Pita Plate",
+    description:
+      "A five-minute snack plate: warm pita, hummus, and whatever crunchy veg is in the crisper.",
+    emoji: "🧆",
+    imageUrl:
+      "https://images.unsplash.com/photo-1577805947697-89e18249d767?auto=format&fit=crop&w=1200&q=80",
+    timeMinutes: 5,
+    cost: "$3–5",
+    servings: 1,
+    diets: ["halal", "vegetarian", "vegan"],
+    meal: "snack",
+    ingredients: [
+      "1|pita, warmed",
+      "1/3 cup|hummus",
+      "1/2|cucumber or carrot, sliced",
+      "1 pinch|paprika or za'atar",
+    ],
+    steps: [
+      "Warm the pita in a dry pan or microwave for 20 seconds.",
+      "Spoon hummus onto a plate and swirl. Dust with paprika.",
+      "Cut the pita into wedges and pile on cucumber or carrot. Dip and snack.",
     ],
     source: "kitchen",
   },

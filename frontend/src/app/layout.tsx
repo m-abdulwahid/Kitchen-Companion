@@ -14,9 +14,9 @@ const fredoka = Fredoka({
 });
 
 export const metadata: Metadata = {
-  title: "Whisk-Ella",
+  title: "Whiskers",
   description:
-    "Live cooking with Ella: camera on the plate, a whisk of help in your ear.",
+    "Live cooking with Whisk-Ella: camera on the plate, a whisk of help in your ear.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
