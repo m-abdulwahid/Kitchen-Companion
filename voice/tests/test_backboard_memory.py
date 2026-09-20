@@ -1,4 +1,5 @@
 """Credit-free tests for the Backboard memory boundary."""
+import asyncio
 import sys
 import unittest
 from pathlib import Path
@@ -29,6 +30,23 @@ class MemoryCommandTests(unittest.TestCase):
         self.assertEqual(memory.assistant_rows([row]), [row])
         self.assertEqual(memory.assistant_rows({"assistants": [row]}), [row])
         self.assertEqual(memory.assistant_rows({"assistants": "wrong"}), [])
+
+    def test_existing_array_assistant_is_reused_without_a_new_write(self):
+        profile_id = "cook_12345678"
+        row = {"assistant_id": "assistant_123", "name": memory.assistant_name(profile_id)}
+
+        class Client(memory.BackboardMemory):
+            def __init__(self):
+                super().__init__(api_key="test-key")
+                self.calls: list[tuple[str, str]] = []
+
+            async def _request(self, method, path, **kwargs):
+                self.calls.append((method, path))
+                return [row]
+
+        client = Client()
+        self.assertEqual(asyncio.run(client.ensure_assistant(profile_id)), "assistant_123")
+        self.assertEqual(client.calls, [("GET", "/assistants")])
 
     def test_context_is_short_and_labeled(self):
         context = memory.memory_context(["Avoid peanuts.", "Use less salt.", "Likes spicy food.", "ignored"])

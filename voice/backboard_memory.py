@@ -81,7 +81,7 @@ class BackboardMemory:
 
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = (api_key if api_key is not None else os.getenv("BACKBOARD_API_KEY", "")).strip()
-        self.assistants: dict[str, str] = {}
+        self.assistants: dict[str, list[str]] = {}
         self.searches: dict[tuple[str, str], tuple[float, list[str]]] = {}
 
     @property
@@ -99,30 +99,39 @@ class BackboardMemory:
         response.raise_for_status()
         return response.json() if response.content else {}
 
-    async def ensure_assistant(self, profile_id: str) -> str:
+    async def assistant_ids(self, profile_id: str) -> list[str]:
+        """Return all matching assistants, including duplicates made by older app versions."""
         profile_id = valid_profile_id(profile_id)
         if not self.enabled or not profile_id:
-            return ""
+            return []
         if cached := self.assistants.get(profile_id):
             return cached
         name = assistant_name(profile_id)
-        listed = await self._request("GET", "/assistants", params={"name": name, "limit": 1})
+        listed = await self._request("GET", "/assistants", params={"name": name, "limit": 100})
+        identifiers: list[str] = []
         for candidate in assistant_rows(listed):
             if candidate.get("name") == name:
                 identifier = clean_text(candidate.get("assistant_id") or candidate.get("id"), 128)
-                if identifier:
-                    self.assistants[profile_id] = identifier
-                    return identifier
+                if identifier and identifier not in identifiers:
+                    identifiers.append(identifier)
+        if identifiers:
+            self.assistants[profile_id] = identifiers
+            return identifiers
         created = await self._request("POST", "/assistants", json={
             "name": name,
             "system_prompt": "Store only the cook's explicit, durable cooking preferences. Never infer sensitive facts.",
             "custom_fact_extraction_prompt": "Do not extract facts automatically; Kitchen Companion writes explicit facts manually.",
         })
-        identifier = clean_text((created or {}).get("assistant_id") or (created or {}).get("id"), 128)
+        created_row = created if isinstance(created, dict) else {}
+        identifier = clean_text(created_row.get("assistant_id") or created_row.get("id"), 128)
         if not identifier:
             raise RuntimeError("Backboard created an assistant without an id")
-        self.assistants[profile_id] = identifier
-        return identifier
+        self.assistants[profile_id] = [identifier]
+        return [identifier]
+
+    async def ensure_assistant(self, profile_id: str) -> str:
+        identifiers = await self.assistant_ids(profile_id)
+        return identifiers[0] if identifiers else ""
 
     async def recall(self, profile_id: str, query: str) -> list[str]:
         profile_id = valid_profile_id(profile_id)
@@ -133,19 +142,27 @@ class BackboardMemory:
         cached = self.searches.get(cache_key)
         if cached and time.monotonic() - cached[0] < MEMORY_CACHE_SECONDS:
             return cached[1]
-        assistant_id = await self.ensure_assistant(profile_id)
-        result = await self._request("POST", f"/assistants/{assistant_id}/memories/search", json={"query": query, "limit": MAX_CONTEXT_ITEMS})
-        rows = result.get("memories", []) if isinstance(result, dict) else []
+        assistant_ids = await self.assistant_ids(profile_id)
         memories: list[str] = []
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            metadata = row.get("metadata") or {}
-            if isinstance(metadata, dict) and metadata.get("profile_id") not in {None, profile_id}:
-                continue
-            content = clean_text(row.get("content"), MAX_FACT_CHARS)
-            if content:
-                memories.append(content)
+        for assistant_id in assistant_ids:
+            result = await self._request(
+                "POST", f"/assistants/{assistant_id}/memories/search",
+                json={"query": query, "limit": MAX_CONTEXT_ITEMS},
+            )
+            rows = result.get("memories", []) if isinstance(result, dict) else []
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                metadata = row.get("metadata") or {}
+                if isinstance(metadata, dict) and metadata.get("profile_id") not in {None, profile_id}:
+                    continue
+                content = clean_text(row.get("content"), MAX_FACT_CHARS)
+                if content and content not in memories:
+                    memories.append(content)
+                    if len(memories) >= MAX_CONTEXT_ITEMS:
+                        break
+            if len(memories) >= MAX_CONTEXT_ITEMS:
+                break
         self.searches[cache_key] = (time.monotonic(), memories)
         return memories
 
