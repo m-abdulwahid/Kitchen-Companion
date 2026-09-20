@@ -58,6 +58,16 @@ def assistant_name(profile_id: str) -> str:
     return f"{ASSISTANT_PREFIX} · {profile_id}"
 
 
+def assistant_rows(payload: object) -> list[dict[str, Any]]:
+    """Accept both Backboard's current array response and its earlier wrapper."""
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        rows = payload.get("assistants", [])
+        return [row for row in rows if isinstance(row, dict)] if isinstance(rows, list) else []
+    return []
+
+
 def memory_context(memories: list[str]) -> str:
     cleaned = [clean_text(memory, MAX_FACT_CHARS) for memory in memories]
     cleaned = [memory for memory in cleaned if memory]
@@ -97,9 +107,8 @@ class BackboardMemory:
             return cached
         name = assistant_name(profile_id)
         listed = await self._request("GET", "/assistants", params={"name": name, "limit": 1})
-        candidates = listed.get("assistants", []) if isinstance(listed, dict) else []
-        for candidate in candidates:
-            if isinstance(candidate, dict) and candidate.get("name") == name:
+        for candidate in assistant_rows(listed):
+            if candidate.get("name") == name:
                 identifier = clean_text(candidate.get("assistant_id") or candidate.get("id"), 128)
                 if identifier:
                     self.assistants[profile_id] = identifier

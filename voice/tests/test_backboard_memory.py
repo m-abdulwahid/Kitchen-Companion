@@ -24,6 +24,12 @@ class MemoryCommandTests(unittest.TestCase):
         self.assertEqual(memory.valid_profile_id("nora@example.com"), "")
         self.assertEqual(memory.valid_profile_id("display name"), "")
 
+    def test_assistant_rows_accepts_backboards_array_response(self):
+        row = {"assistant_id": "assistant_123", "name": "Kitchen Companion Memory · cook_12345678"}
+        self.assertEqual(memory.assistant_rows([row]), [row])
+        self.assertEqual(memory.assistant_rows({"assistants": [row]}), [row])
+        self.assertEqual(memory.assistant_rows({"assistants": "wrong"}), [])
+
     def test_context_is_short_and_labeled(self):
         context = memory.memory_context(["Avoid peanuts.", "Use less salt.", "Likes spicy food.", "ignored"])
         self.assertIn("Backboard", context)
