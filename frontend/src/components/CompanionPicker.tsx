@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { LanguagePicker } from "@/components/LanguagePicker";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
+import { ASSISTANT } from "@/lib/assistant";
 import { COMPANIONS, type Companion } from "@/lib/companions";
 import { speakText } from "@/lib/voice-api";
 
 type Phase = { id: string; step: "loading" | "playing" } | null;
 
-/** Small voice chips — Remy stays the chef; this only changes how he sounds. */
 export function CompanionPicker() {
   const { companion, setCompanion } = useCompanion();
   const { language } = useLanguage();
@@ -44,7 +44,7 @@ export function CompanionPicker() {
     abortRef.current = controller;
     try {
       const reply = await speakText(
-        `Hi, I'm Remy. Let's cook something good!`,
+        `Hi, I'm ${ASSISTANT.name}. Let's whisk something up.`,
         candidate.voice,
         language.code,
         controller.signal,
@@ -61,12 +61,15 @@ export function CompanionPicker() {
     } catch {
       if (controller.signal.aborted) return;
       setPhase(null);
-      setError("Couldn't play that voice.");
+      setError("That voice is camera-shy. Try again in a beat.");
     }
   }
 
   return (
-    <div className="mt-2">
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-caramel">
+        Ella&apos;s voice
+      </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {COMPANIONS.map((item) => {
           const selected = item.id === companion.id;
@@ -93,10 +96,10 @@ export function CompanionPicker() {
             </div>
           );
         })}
-        <LanguagePicker compact />
       </div>
+      <LanguagePicker compact />
       {error ? (
-        <p role="alert" className="mt-1 text-xs text-raspberry">
+        <p role="alert" className="text-xs text-raspberry">
           {error}
         </p>
       ) : null}

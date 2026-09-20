@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { RecipeCard } from "@/components/RecipeCard";
 import type { Recipe } from "@/lib/types";
 
@@ -5,7 +6,7 @@ type RecipeGridProps = {
   recipes: Recipe[];
   savedIds: string[];
   onOpen: (recipe: Recipe) => void;
-  emptyMessage: string;
+  emptyMessage: ReactNode;
 };
 
 export function RecipeGrid({

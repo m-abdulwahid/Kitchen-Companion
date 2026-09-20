@@ -8,7 +8,7 @@ type RecipeCardProps = {
 
 const dietLabel: Record<string, string> = {
   halal: "halal",
-  vegetarian: "veggie",
+  vegetarian: "vegetarian",
   vegan: "vegan",
   "gluten-free": "GF",
 };

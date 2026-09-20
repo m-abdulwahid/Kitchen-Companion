@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { LanguagePicker } from "@/components/LanguagePicker";
-import { Remy } from "@/components/Remy";
+import { Ella } from "@/components/Ella";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
+import { ASSISTANT } from "@/lib/assistant";
 import type { Recipe } from "@/lib/types";
 import { checkStepWithVision } from "@/lib/voice-api";
 
@@ -35,7 +35,7 @@ function liveLabels(name: string): Record<LiveState, string> {
   };
 }
 
-type RemyMood = "idle" | "talk" | "listen" | "cheer";
+type EllaMood = "idle" | "talk" | "listen" | "cheer";
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -44,19 +44,21 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [checking, setChecking] = useState(false);
   const [cameraProblem, setCameraProblem] = useState("");
   const [cameraTry, setCameraTry] = useState(0);
-  const [moodState, setMoodState] = useState<{ mood: RemyMood; stepIndex: number }>(
+  const [peekNext, setPeekNext] = useState(false);
+  const [moodState, setMoodState] = useState<{ mood: EllaMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
   );
-  const remyMood = moodState.stepIndex === stepIndex ? moodState.mood : "idle";
-  const setRemyMood = (mood: RemyMood) => setMoodState({ mood, stepIndex });
+  const ellaMood = moodState.stepIndex === stepIndex ? moodState.mood : "idle";
+  const setEllaMood = (mood: EllaMood) => setMoodState({ mood, stepIndex });
   const { companion } = useCompanion();
   const { language } = useLanguage();
   const step = recipe.steps[stepIndex];
+  const nextStepText =
+    stepIndex + 1 < recipe.steps.length ? recipe.steps[stepIndex + 1] : undefined;
   const stepSpeech = `Step ${stepIndex + 1}. ${step}`;
-  const upcomingSpeech =
-    stepIndex + 1 < recipe.steps.length
-      ? `Step ${stepIndex + 2}. ${recipe.steps[stepIndex + 1]}`
-      : undefined;
+  const upcomingSpeech = nextStepText
+    ? `Step ${stepIndex + 2}. ${nextStepText}`
+    : undefined;
   const {
     state: voiceState,
     toggle: toggleVoice,
@@ -93,7 +95,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       ? "listen"
       : liveState === "speaking" || voiceState === "speaking"
         ? "talk"
-        : remyMood;
+        : ellaMood;
 
   useEffect(() => {
     let stream: MediaStream | undefined;
@@ -110,13 +112,12 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
           videoRef.current.srcObject = media;
         }
         setCameraProblem("");
-        setStatus("Live camera on. Talk to Remy whenever you need him.");
+        setStatus("Camera's on. Tap Ask Ella and just say your question.");
       })
       .catch((error) => {
         if (cancelled) return;
-        // say what actually went wrong: a blocked permission, a busy camera and a missing one need different fixes
         setCameraProblem(describeCameraError(error));
-        setStatus("Remy can't see the pan yet. Fix the camera and press Try again.");
+        setStatus("Ella can't see the plate yet. Fix the camera and press Try again.");
       });
 
     return () => {
@@ -135,7 +136,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     const video = videoRef.current;
     if (!video) return;
     setChecking(true);
-    setRemyMood("talk");
+    setEllaMood("talk");
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
@@ -148,10 +149,10 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       });
       setStatus(result.feedback);
       speak(result.feedback);
-      setRemyMood(result.passed ? "cheer" : "idle");
+      setEllaMood(result.passed ? "cheer" : "idle");
     } catch {
-      setStatus(`${companion.name} couldn’t check that step. Is the voice service running?`);
-      setRemyMood("idle");
+      setStatus(`${ASSISTANT.name} couldn’t check that step. Is the voice service running?`);
+      setEllaMood("idle");
     } finally {
       setChecking(false);
     }
@@ -161,13 +162,15 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     if (stepIndex >= recipe.steps.length - 1) {
       if (!handsFreeActive) speak(`That’s the last step. ${recipe.title} is done. You crushed it.`);
       setStatus("Last step — plate it cute.");
-      setRemyMood("cheer");
+      setEllaMood("cheer");
       return;
     }
+    setPeekNext(false);
     setStepIndex((value) => value + 1);
   }
 
   function prevStep() {
+    setPeekNext(false);
     setStepIndex((value) => Math.max(0, value - 1));
   }
 
@@ -203,22 +206,49 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
           </div>
         ) : null}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="aspect-video w-full bg-black object-cover lg:aspect-[16/10]"
-        />
+        <div className="relative">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="aspect-video w-full bg-black object-cover lg:aspect-[16/10]"
+          />
+          <div className="absolute inset-x-3 bottom-3 rounded-2xl bg-espresso/80 px-4 py-3 text-cream shadow-lg backdrop-blur-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-peach">
+              Now · Step {stepIndex + 1} of {recipe.steps.length}
+            </p>
+            <p className="mt-1 font-display text-lg leading-6">{step}</p>
+            {nextStepText ? (
+              <div className="mt-2 border-t border-white/15 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPeekNext((value) => !value)}
+                  className="text-xs font-semibold uppercase tracking-wide text-peach hover:text-cream"
+                >
+                  {peekNext ? "Hide what’s next" : "What’s next"}
+                </button>
+                {peekNext ? (
+                  <p className="mt-1 text-sm leading-5 text-cream/85">
+                    Step {stepIndex + 2}: {nextStepText}
+                  </p>
+                ) : (
+                  <p className="mt-1 truncate text-sm text-cream/60">
+                    Step {stepIndex + 2}: {nextStepText}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-xs font-semibold text-peach">Last turn — you’re plating.</p>
+            )}
+          </div>
+        </div>
       </div>
       <div className="flex flex-col gap-3">
         <div className="rounded-[2rem] bg-white p-4 shadow-[0_12px_32px_rgba(107,63,42,0.1)]">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-caramel">
-              Step {stepIndex + 1} of {recipe.steps.length}
-            </p>
-            <LanguagePicker compact />
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-caramel">
+            Step {stepIndex + 1} of {recipe.steps.length}
+          </p>
           <p className="mt-2 font-display text-xl leading-7 text-espresso">{step}</p>
           <div className="mt-4 grid grid-cols-2 gap-2">
             <button
@@ -253,13 +283,16 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              disabled={
-                voiceState === "thinking" || handsFreeActive
-              }
+              disabled={voiceState === "thinking" || handsFreeActive}
               onClick={() => toggleVoice(step)}
-              className="rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
+              className="flex items-center justify-center gap-2 rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
             >
-              {askLabels(companion.name)[voiceState]}
+              <img
+                src="/brand/whisk-ella-avatar.png"
+                alt=""
+                className="h-7 w-7 rounded-full bg-white object-cover"
+              />
+              {askLabels(ASSISTANT.name)[voiceState]}
             </button>
             <button
               type="button"
@@ -268,23 +301,22 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
                 if (liveState === "idle" || liveState === "error") {
                   interruptLegacySpeech();
                   void startLive();
-                }
-                else stopLive();
+                } else stopLive();
               }}
               className="rounded-2xl bg-espresso py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
             >
               {liveState === "listening" || liveState === "speaking"
                 ? "Disable hands-free"
-                : liveLabels(companion.name)[liveState]}
+                : liveLabels(ASSISTANT.name)[liveState]}
             </button>
             {(liveState === "listening" || liveState === "speaking") && (
               <p className="col-span-2 text-center text-xs font-semibold text-caramel">
-                Hands-free is on. Speak naturally; Remy will stop when you start talking.
+                Hands-free is on. Speak naturally; Ella will pause when you start talking.
               </p>
             )}
           </div>
         </div>
-        <Remy size="sm" mood={shownMood} message={status} />
+        <Ella size="sm" mood={shownMood} message={status} />
       </div>
     </section>
   );

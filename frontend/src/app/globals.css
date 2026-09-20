@@ -46,3 +46,9 @@ body {
 .animate-pip {
   animation: pip-sway 2.8s ease-in-out infinite;
 }
+
+.menu-paper {
+  background-image:
+    radial-gradient(circle at 8% 0%, #ffe7d2 0%, transparent 36%),
+    linear-gradient(180deg, rgba(196, 120, 74, 0.04), transparent 28%);
+}

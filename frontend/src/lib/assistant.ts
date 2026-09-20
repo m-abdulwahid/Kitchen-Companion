@@ -1,4 +1,5 @@
 export const ASSISTANT = {
-  name: "Remy",
-  tagline: "tiny rat chef with a wooden spoon and big opinions",
+  brand: "Whisk-Ella",
+  name: "Ella",
+  tagline: "a whisk of help, a purr of encouragement",
 } as const;

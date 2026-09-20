@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CookingView } from "@/components/CookingView";
 import { RecipeBrowser } from "@/components/RecipeBrowser";
@@ -75,17 +76,28 @@ export function KitchenFlow({ mode }: KitchenFlowProps) {
       recipes={list}
       savedIds={cookbook.savedRecipes.map((recipe) => recipe.id)}
       onOpen={setPicked}
-      live={mode === "explore"}
-      heading={mode === "cookbook" ? "My cookbook" : "What’s cooking?"}
+      heading={mode === "cookbook" ? "Your Cookbook" : "What’s cooking?"}
       subheading={
         mode === "cookbook"
           ? "Everything you saved — still searchable by ingredient and diet."
-          : "Pick a dish, then cook live with Remy in your ear and the camera on the pan."
+          : "Pick a dish, then cook live with Ella by your side and the camera watching your plate."
       }
       emptyMessage={
-        mode === "cookbook"
-          ? "Your cookbook is empty. Save a recipe from Explore or generate one from a video."
-          : "No matches. Try another search or fewer diet filters."
+        mode === "cookbook" ? (
+          <span>
+            Your cookbook is empty. Save a recipe from{" "}
+            <Link href="/" className="font-semibold text-tomato underline-offset-2 hover:underline">
+              Explore
+            </Link>{" "}
+            or generate one from a video using{" "}
+            <Link href="/upload" className="font-semibold text-tomato underline-offset-2 hover:underline">
+              Upload
+            </Link>
+            .
+          </span>
+        ) : (
+          "No matches. Try another search or fewer filters."
+        )
       }
     />
   );
