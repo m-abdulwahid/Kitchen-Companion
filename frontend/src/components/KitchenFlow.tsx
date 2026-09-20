@@ -74,29 +74,18 @@ export function KitchenFlow({ mode }: KitchenFlowProps) {
   return (
     <RecipeBrowser
       recipes={list}
-      savedIds={cookbook.savedRecipes.map((recipe) => recipe.id)}
       onOpen={setPicked}
-      heading={mode === "cookbook" ? "Your Cookbook" : "What’s cooking?"}
-      subheading={
-        mode === "cookbook"
-          ? "Everything you saved — still searchable by ingredient and diet."
-          : "Pick a dish, then cook live with Ella by your side and the camera watching your plate."
-      }
+      heading={mode === "cookbook" ? "Cookbook" : "Explore"}
       emptyMessage={
         mode === "cookbook" ? (
           <span>
-            Your cookbook is empty. Save a recipe from{" "}
-            <Link href="/" className="font-semibold text-tomato underline-offset-2 hover:underline">
+            Nothing saved yet.{" "}
+            <Link href="/" className="font-semibold text-tomato hover:underline">
               Explore
-            </Link>{" "}
-            or generate one from a video using{" "}
-            <Link href="/upload" className="font-semibold text-tomato underline-offset-2 hover:underline">
-              Upload
             </Link>
-            .
           </span>
         ) : (
-          "No matches. Try another search or fewer filters."
+          "No recipes match."
         )
       }
     />

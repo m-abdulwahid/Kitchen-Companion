@@ -5,5 +5,5 @@ export const PROJECT = {
 export const ASSISTANT = {
   brand: "Whisk-Ella",
   name: "Ella",
-  tagline: "a whisk of help, a purr of encouragement",
+  tagline: "a whisk of help in your ear",
 } as const;
