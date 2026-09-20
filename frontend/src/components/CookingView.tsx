@@ -9,8 +9,6 @@ import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import type { CookingAgentDecision } from "@/lib/cooking-agent-api";
-import { cookingMemoryProfileId } from "@/lib/cooking-profile";
-import { saveCookingMemory } from "@/lib/memory-api";
 import { ASSISTANT } from "@/lib/assistant";
 import type { Recipe } from "@/lib/types";
 import { checkStepWithVision } from "@/lib/voice-api";
@@ -48,9 +46,6 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [checking, setChecking] = useState(false);
   const [cameraProblem, setCameraProblem] = useState("");
   const [cameraTry, setCameraTry] = useState(0);
-  const [memoryDraft, setMemoryDraft] = useState("");
-  const [memoryStatus, setMemoryStatus] = useState("");
-  const [savingMemory, setSavingMemory] = useState(false);
   const [peekNext, setPeekNext] = useState(false);
   const [moodState, setMoodState] = useState<{ mood: EllaMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
@@ -118,7 +113,7 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       speakProactively(decision.say);
     }
   };
-  const { isWatching, framesSent, maxFrames } = useCookingAgent({
+  const { isWatching } = useCookingAgent({
     enabled: liveState === "listening" || liveState === "speaking",
     videoRef,
     recipe,
@@ -209,22 +204,6 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   function prevStep() {
     setPeekNext(false);
     setStepIndex((value) => Math.max(0, value - 1));
-  }
-
-  async function updateCookingMemory(action: "remember" | "forget") {
-    const fact = memoryDraft.trim();
-    if (fact.length < 3) return;
-    setSavingMemory(true);
-    setMemoryStatus("");
-    try {
-      await saveCookingMemory(cookingMemoryProfileId(), fact, action);
-      setMemoryStatus(action === "remember" ? "Saved for future cooks on this browser." : "Removed when a matching memory was found.");
-      setMemoryDraft("");
-    } catch (error) {
-      setMemoryStatus(error instanceof Error ? error.message : "Memory could not be updated.");
-    } finally {
-      setSavingMemory(false);
-    }
   }
 
   return (
@@ -338,13 +317,8 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
               type="button"
               disabled={voiceState === "thinking" || handsFreeActive}
               onClick={() => toggleVoice(step)}
-              className="flex items-center justify-center gap-2 rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
+              className="rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
             >
-              <img
-                src="/brand/whisk-ella-avatar.png"
-                alt=""
-                className="h-8 w-7 bg-transparent object-contain"
-              />
               {askLabels(ASSISTANT.name)[voiceState]}
             </button>
             <button
@@ -362,46 +336,9 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
                 ? "Disable hands-free"
                 : liveLabels(ASSISTANT.name)[liveState]}
             </button>
-            {(liveState === "listening" || liveState === "speaking") && (
-              <p className="col-span-2 text-center text-xs font-semibold text-caramel">
-                Hands-free is on. Ella watches changed frames ({framesSent}/{maxFrames}) and stops talking when you speak.
-              </p>
-            )}
           </div>
         </div>
         <Ella size="sm" mood={shownMood} message={status} />
-        <div className="rounded-[2rem] bg-white p-4 shadow-[0_12px_32px_rgba(107,63,42,0.1)]">
-          <p className="font-display text-lg text-espresso">Ella&apos;s kitchen memory</p>
-          <p className="mt-1 text-xs leading-5 text-cocoa">
-            Save only a preference you want this browser to remember, like “no peanuts” or “likes extra spice”.
-          </p>
-          <input
-            value={memoryDraft}
-            onChange={(event) => setMemoryDraft(event.target.value)}
-            maxLength={240}
-            placeholder="A cooking preference…"
-            className="mt-3 w-full rounded-xl border border-peach bg-cream px-3 py-2 text-sm text-espresso outline-none placeholder:text-caramel focus:border-tomato"
-          />
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={savingMemory || memoryDraft.trim().length < 3}
-              onClick={() => void updateCookingMemory("remember")}
-              className="rounded-xl bg-espresso py-2 text-sm font-semibold text-cream disabled:opacity-60"
-            >
-              {savingMemory ? "Saving…" : "Remember"}
-            </button>
-            <button
-              type="button"
-              disabled={savingMemory || memoryDraft.trim().length < 3}
-              onClick={() => void updateCookingMemory("forget")}
-              className="rounded-xl bg-peach py-2 text-sm font-semibold text-cocoa disabled:opacity-60"
-            >
-              Forget
-            </button>
-          </div>
-          {memoryStatus ? <p className="mt-2 text-xs font-medium text-caramel">{memoryStatus}</p> : null}
-        </div>
       </div>
     </section>
   );

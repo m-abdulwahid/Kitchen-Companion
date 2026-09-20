@@ -33,7 +33,6 @@ export function RecipeOverflowMenu({
         type="button"
         onClick={onSave}
         aria-label={saved ? "Remove from cookbook" : "Save to cookbook"}
-        title={saved ? "Saved in Your Cookbook" : "Save to Your Cookbook"}
         className={`grid h-10 w-10 place-items-center rounded-full bg-white/95 shadow-sm ring-1 ring-peach/80 hover:bg-peach ${
           saved ? "text-raspberry" : "text-cocoa"
         }`}
@@ -76,7 +75,7 @@ export function RecipeOverflowMenu({
               }}
               className="block w-full px-4 py-2.5 text-left font-semibold text-cocoa hover:bg-cream"
             >
-              {copied ? "Copied" : "🔗 Share"}
+              {copied ? "Copied" : "Share"}
             </button>
             <div className="mx-3 my-2 border-t border-peach/70" />
             <div className="px-3 pb-2">

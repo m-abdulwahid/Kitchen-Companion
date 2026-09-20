@@ -173,7 +173,7 @@ export const RECIPES: Recipe[] = [
       "Rice, a can of beans, cumin. A complete plate from the pantry, ready in about 20 minutes.",
     emoji: "🍚",
     imageUrl:
-      "https://images.unsplash.com/photo-1543353071-873f17a7a088?auto=format&fit=crop&w=1200&q=80",
+      "https://www.themealdb.com/images/media/meals/j8c1d51782772399.jpg",
     timeMinutes: 20,
     cost: "$4–7",
     servings: 2,
@@ -371,7 +371,7 @@ export const RECIPES: Recipe[] = [
       "A five-minute snack plate: warm pita, hummus, and whatever crunchy veg is in the crisper.",
     emoji: "🧆",
     imageUrl:
-      "https://images.unsplash.com/photo-1577805947697-89e18249d767?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1697126248437-db26a30024c5?auto=format&fit=crop&w=1200&q=80",
     timeMinutes: 5,
     cost: "$3–5",
     servings: 1,

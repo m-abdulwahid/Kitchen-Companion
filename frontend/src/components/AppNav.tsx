@@ -3,31 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { BrandMark } from "@/components/BrandMark";
-import { ASSISTANT, PROJECT } from "@/lib/assistant";
 
-const courses = [
-  {
-    href: "/",
-    course: "Main Course",
-    label: "Explore",
-    note: "Browse today's specials",
-    icon: ExploreIcon,
-  },
-  {
-    href: "/cookbook",
-    course: "Sides",
-    label: "Your Cookbook",
-    note: "Dishes you already love",
-    icon: CookbookIcon,
-  },
-  {
-    href: "/upload",
-    course: "Chef's Specials",
-    label: "Upload",
-    note: "A recipe from a video",
-    icon: UploadIcon,
-  },
+const items = [
+  { href: "/", label: "Explore", icon: ExploreIcon },
+  { href: "/cookbook", label: "Cookbook", icon: CookbookIcon },
+  { href: "/upload", label: "Upload", icon: UploadIcon },
 ];
 
 export function AppNav() {
@@ -45,104 +25,56 @@ export function AppNav() {
         />
       ) : null}
 
-      <aside className="fixed inset-y-0 left-0 z-40 flex">
-        <div className="flex w-[4.25rem] flex-col items-center border-r border-peach/80 bg-cream/95 py-3 backdrop-blur">
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            aria-label={open ? "Collapse menu" : "Expand menu"}
-            className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-espresso shadow-sm ring-1 ring-peach/80 hover:bg-peach"
-          >
-            <MenuIcon />
-          </button>
-
-          <nav className="mt-4 flex flex-col items-center gap-2">
-            {courses.map((item) => {
-              const active = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={item.label}
-                  aria-label={item.label}
-                  className={`grid h-10 w-10 place-items-center rounded-2xl ${
-                    active
-                      ? "bg-espresso text-cream"
-                      : "bg-white text-cocoa ring-1 ring-peach/80 hover:bg-peach"
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex flex-col border-r border-peach/80 bg-cream/95 py-3 backdrop-blur transition-[width] duration-200 ${
+          open ? "w-52 px-3" : "w-[4.25rem] items-center px-0"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-label={open ? "Collapse menu" : "Expand menu"}
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white text-espresso shadow-sm ring-1 ring-peach/80 hover:bg-peach"
+        >
+          <MenuIcon />
+        </button>
+        <nav className={`mt-4 flex flex-col gap-2 ${open ? "w-full" : "items-center"}`}>
+          {items.map((item) => {
+            const active = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-label={item.label}
+                className={`flex h-10 items-center overflow-hidden rounded-2xl ${
+                  open ? "w-full gap-3 px-1.5" : "w-10 justify-center"
+                } ${
+                  active
+                    ? "bg-espresso text-cream"
+                    : "bg-white text-cocoa ring-1 ring-peach/80 hover:bg-peach"
+                }`}
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center">
+                  <Icon />
+                </span>
+                <span
+                  className={`whitespace-nowrap text-sm font-semibold transition-opacity duration-200 ${
+                    open ? "opacity-100" : "sr-only"
                   }`}
                 >
-                  <Icon />
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div
-          className={`menu-paper h-full overflow-y-auto border-r border-peach bg-[#fffaf2] shadow-[8px_0_28px_rgba(61,36,24,0.12)] transition-[width] duration-200 ${
-            open ? "w-[20.5rem] px-5 py-5" : "w-0 overflow-hidden px-0 py-0"
-          }`}
-        >
-          <div className={open ? "w-[18rem]" : "hidden"}>
-            <div className="text-center">
-              <div className="mx-auto w-fit">
-                <BrandMark
-                  src="/brand/whisk-ella-logo.png"
-                  alt="Whiskers logo"
-                  className="h-14 w-14"
-                />
-              </div>
-              <p className="mt-2 font-display text-3xl text-espresso">{PROJECT.name}</p>
-              <svg viewBox="0 0 260 56" className="mx-auto h-12 w-56">
-                <path id="whisk-arc" d="M18 48 Q130 0 242 48" fill="none" />
-                <text
-                  fill="#c4784a"
-                  fontFamily="var(--font-fredoka), Fredoka, sans-serif"
-                  fontSize="22"
-                >
-                  <textPath href="#whisk-arc" startOffset="50%" textAnchor="middle">
-                    with {ASSISTANT.brand}
-                  </textPath>
-                </text>
-              </svg>
-              <p className="font-display text-sm tracking-[0.35em] text-caramel uppercase">
-                today&apos;s menu
-              </p>
-            </div>
-
-            <nav className="mt-6 space-y-4">
-              {courses.map((item) => {
-                const active = pathname === item.href;
-                return (
-                  <Link
-                    key={`${item.href}-full`}
-                    href={item.href}
-                    className={`block rounded-2xl border border-dashed border-caramel/30 px-4 py-3 ${
-                      active ? "bg-peach/70" : "bg-white/50 hover:bg-peach/40"
-                    }`}
-                  >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-caramel">
-                      {item.course}
-                    </p>
-                    <div className="mt-1 border-b border-dotted border-caramel/50 pb-1">
-                      <span className="font-display text-2xl text-espresso">
-                        {item.label}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-cocoa/75">{item.note}</p>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
       </aside>
 
       <div
         className={`shrink-0 transition-[width] duration-200 ${
-          open ? "w-[4.25rem] md:w-[calc(4.25rem+20.5rem)]" : "w-[4.25rem]"
+          open ? "w-52" : "w-[4.25rem]"
         }`}
       />
     </>
