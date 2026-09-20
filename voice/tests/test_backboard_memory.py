@@ -16,7 +16,14 @@ class MemoryCommandTests(unittest.TestCase):
                          memory.MemoryCommand("forget", "I hate cilantro"))
         self.assertEqual(memory.extract_memory_command("Ella, remember that I am allergic to peanuts."),
                          memory.MemoryCommand("remember", "I am allergic to peanuts"))
+        self.assertEqual(memory.extract_memory_command("Could you please save that I am allergic to peanuts?"),
+                         memory.MemoryCommand("remember", "I am allergic to peanuts"))
+        self.assertEqual(memory.extract_memory_command("I have a peanut allergy, remember that."),
+                         memory.MemoryCommand("remember", "I have a peanut allergy"))
+        self.assertEqual(memory.extract_memory_command("I have a peanut allergy, please remember."),
+                         memory.MemoryCommand("remember", "I have a peanut allergy"))
         self.assertIsNone(memory.extract_memory_command("I am allergic to peanuts"))
+        self.assertIsNone(memory.extract_memory_command("Do you remember that I am allergic to peanuts?"))
         self.assertIsNone(memory.extract_memory_command("remember"))
 
     def test_profile_ids_are_random_id_shapes_not_names(self):

@@ -42,16 +42,32 @@ def valid_profile_id(value: object) -> str:
 def extract_memory_command(text: object) -> MemoryCommand | None:
     """Persist only an explicit request, never an inferred sensitive fact."""
     spoken = clean_text(text, MAX_FACT_CHARS + 40)
-    match = re.match(
-        r"(?i)^(?:(?:ella|whisk[- ]ella|remy)[,:]?\s+)?(?:please\s+)?(remember|forget)(?: that)?\s+(.+?)[.!?]*$",
+    prefix = r"(?:(?:ella|whisk[- ]ella|remy)[,:]?\s+)?"
+    # A cook should be able to make a clear, natural saving request without
+    # needing to memorize one exact command. Every accepted form still has an
+    # explicit remember/forget/save word, so mentioning an allergy alone never
+    # writes sensitive information.
+    leading = re.match(
+        rf"(?i)^{prefix}(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?"
+        r"(remember|forget|save|store)(?:\s+that)?\s+(.+?)[.!?]*$",
         spoken,
     )
-    if not match:
+    trailing = re.match(
+        rf"(?i)^{prefix}(.+?)[,;]?\s+(?:and\s+)?(?:please\s+)?"
+        r"(remember|forget|save|store)(?:\s+that)?[.!?]*$",
+        spoken,
+    )
+    if leading:
+        verb, raw_fact = leading.group(1), leading.group(2)
+    elif trailing:
+        raw_fact, verb = trailing.group(1), trailing.group(2)
+    else:
         return None
-    fact = clean_text(match.group(2), MAX_FACT_CHARS)
+    action = "forget" if verb.lower() == "forget" else "remember"
+    fact = clean_text(raw_fact, MAX_FACT_CHARS)
     if len(fact) < 3:
         return None
-    return MemoryCommand(action=match.group(1).lower(), fact=fact)
+    return MemoryCommand(action=action, fact=fact)
 
 
 def assistant_name(profile_id: str) -> str:
