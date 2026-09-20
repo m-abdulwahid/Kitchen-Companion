@@ -267,5 +267,5 @@ export function useVoiceAssistant({ onReply, onError, onSpoken, companion }: Opt
     };
   }, [releaseMic, stopPlayback]);
 
-  return { state, toggle, speak };
+  return { state, toggle, speak, interruptSpeech };
 }

@@ -5,9 +5,11 @@ import { LanguagePicker } from "@/components/LanguagePicker";
 import { Remy } from "@/components/Remy";
 import { useCompanion } from "@/hooks/useCompanion";
 import { useLanguage } from "@/hooks/useLanguage";
+import { useLiveSession, type LiveState } from "@/hooks/useLiveSession";
 import { useVoiceAssistant, type VoiceState } from "@/hooks/useVoiceAssistant";
-import { checkStepWithVision } from "@/lib/mocks";
+import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import type { Recipe } from "@/lib/types";
+import { checkStepWithVision } from "@/lib/voice-api";
 
 type CookingViewProps = {
   recipe: Recipe;
@@ -23,6 +25,16 @@ function askLabels(name: string): Record<VoiceState, string> {
   };
 }
 
+function liveLabels(name: string): Record<LiveState, string> {
+  return {
+    idle: `Enable hands-free ${name}`,
+    connecting: "Connecting live voice…",
+    listening: `${name} is listening — just talk`,
+    speaking: `${name} is talking — speak to interrupt`,
+    error: "Retry hands-free voice",
+  };
+}
+
 type RemyMood = "idle" | "talk" | "listen" | "cheer";
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
@@ -30,6 +42,8 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [status, setStatus] = useState("Camera warming up…");
   const [checking, setChecking] = useState(false);
+  const [cameraProblem, setCameraProblem] = useState("");
+  const [cameraTry, setCameraTry] = useState(0);
   const [moodState, setMoodState] = useState<{ mood: RemyMood; stepIndex: number }>(
     { mood: "idle", stepIndex: 0 },
   );
@@ -37,10 +51,17 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
   const setRemyMood = (mood: RemyMood) => setMoodState({ mood, stepIndex });
   const { companion } = useCompanion();
   const { language } = useLanguage();
+  const step = recipe.steps[stepIndex];
+  const stepSpeech = `Step ${stepIndex + 1}. ${step}`;
+  const upcomingSpeech =
+    stepIndex + 1 < recipe.steps.length
+      ? `Step ${stepIndex + 2}. ${recipe.steps[stepIndex + 1]}`
+      : undefined;
   const {
     state: voiceState,
     toggle: toggleVoice,
     speak,
+    interruptSpeech: interruptLegacySpeech,
   } = useVoiceAssistant({
     onReply: setStatus,
     onError: setStatus,
@@ -52,26 +73,33 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
       language: language.code,
     },
   });
+  const { state: liveState, start: startLive, stop: stopLive } = useLiveSession({
+    recipeTitle: recipe.title,
+    currentStep: step,
+    companion: {
+      // Tina is the only voice validated against the Realtime endpoint in Phase 0.
+      voice: "Tina",
+      name: companion.name,
+      style: companion.style,
+      language: language.code,
+    },
+    onReply: setStatus,
+    onError: setStatus,
+  });
+  const handsFreeActive =
+    liveState === "connecting" || liveState === "listening" || liveState === "speaking";
   const shownMood =
-    voiceState === "recording"
+    liveState === "listening" || liveState === "connecting" || voiceState === "recording"
       ? "listen"
-      : voiceState === "speaking"
+      : liveState === "speaking" || voiceState === "speaking"
         ? "talk"
         : remyMood;
-
-  const step = recipe.steps[stepIndex];
-  const stepSpeech = `Step ${stepIndex + 1}. ${step}`;
-  const upcomingSpeech =
-    stepIndex + 1 < recipe.steps.length
-      ? `Step ${stepIndex + 2}. ${recipe.steps[stepIndex + 1]}`
-      : undefined;
 
   useEffect(() => {
     let stream: MediaStream | undefined;
     let cancelled = false;
 
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
+    requestCamera()
       .then((media) => {
         if (cancelled) {
           media.getTracks().forEach((track) => track.stop());
@@ -81,21 +109,27 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = media;
         }
+        setCameraProblem("");
         setStatus("Live camera on. Talk to Remy whenever you need him.");
       })
-      .catch(() => {
-        setStatus("Camera blocked — allow the webcam so Remy can watch the pan.");
+      .catch((error) => {
+        if (cancelled) return;
+        // say what actually went wrong: a blocked permission, a busy camera and a missing one need different fixes
+        setCameraProblem(describeCameraError(error));
+        setStatus("Remy can't see the pan yet. Fix the camera and press Try again.");
       });
 
     return () => {
       cancelled = true;
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [cameraTry]);
 
   useEffect(() => {
-    speak(stepSpeech, upcomingSpeech);
-  }, [stepSpeech, upcomingSpeech, speak, language.code]);
+    // Live mode already has the current step in its prompt; avoid an extra HTTP
+    // voice request every time the cook advances a step.
+    if (!handsFreeActive) speak(stepSpeech, upcomingSpeech);
+  }, [handsFreeActive, stepSpeech, upcomingSpeech, speak, language.code]);
 
   async function captureAndCheck() {
     const video = videoRef.current;
@@ -107,21 +141,25 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
     canvas.height = video.videoHeight || 480;
     canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
     const imageDataUrl = canvas.toDataURL("image/jpeg", 0.7);
-    const result = await checkStepWithVision(
-      imageDataUrl,
-      step,
-      stepIndex,
-      companion.name,
-    );
-    setStatus(result.feedback);
-    speak(result.feedback);
-    setChecking(false);
-    setRemyMood(result.passed ? "cheer" : "idle");
+    try {
+      const result = await checkStepWithVision(imageDataUrl, step, {
+        name: companion.name,
+        style: companion.style,
+      });
+      setStatus(result.feedback);
+      speak(result.feedback);
+      setRemyMood(result.passed ? "cheer" : "idle");
+    } catch {
+      setStatus(`${companion.name} couldn’t check that step. Is the voice service running?`);
+      setRemyMood("idle");
+    } finally {
+      setChecking(false);
+    }
   }
 
   function nextStep() {
     if (stepIndex >= recipe.steps.length - 1) {
-      speak(`That’s the last step. ${recipe.title} is done. You crushed it.`);
+      if (!handsFreeActive) speak(`That’s the last step. ${recipe.title} is done. You crushed it.`);
       setStatus("Last step — plate it cute.");
       setRemyMood("cheer");
       return;
@@ -146,6 +184,25 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             Exit
           </button>
         </div>
+        {cameraProblem ? (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 bg-raspberry/90 px-5 py-3 text-sm text-cream"
+          >
+            <span className="max-w-xl">{cameraProblem}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setCameraProblem("");
+                setStatus("Camera warming up…");
+                setCameraTry((count) => count + 1);
+              }}
+              className="rounded-full bg-cream px-4 py-1.5 font-semibold text-raspberry"
+            >
+              Try again
+            </button>
+          </div>
+        ) : null}
         <video
           ref={videoRef}
           autoPlay
@@ -180,8 +237,9 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
+              disabled={handsFreeActive}
               onClick={() => speak(stepSpeech)}
-              className="rounded-2xl bg-peach py-2.5 text-sm font-semibold text-cocoa"
+              className="rounded-2xl bg-peach py-2.5 text-sm font-semibold text-cocoa disabled:opacity-60"
             >
               Repeat
             </button>
@@ -195,12 +253,35 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
             </button>
             <button
               type="button"
-              disabled={voiceState === "thinking"}
+              disabled={
+                voiceState === "thinking" || handsFreeActive
+              }
               onClick={() => toggleVoice(step)}
-              className="col-span-2 rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
+              className="rounded-2xl bg-tomato py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
             >
               {askLabels(companion.name)[voiceState]}
             </button>
+            <button
+              type="button"
+              disabled={liveState === "connecting"}
+              onClick={() => {
+                if (liveState === "idle" || liveState === "error") {
+                  interruptLegacySpeech();
+                  void startLive();
+                }
+                else stopLive();
+              }}
+              className="rounded-2xl bg-espresso py-3.5 font-display text-lg text-cream shadow disabled:opacity-60"
+            >
+              {liveState === "listening" || liveState === "speaking"
+                ? "Disable hands-free"
+                : liveLabels(companion.name)[liveState]}
+            </button>
+            {(liveState === "listening" || liveState === "speaking") && (
+              <p className="col-span-2 text-center text-xs font-semibold text-caramel">
+                Hands-free is on. Speak naturally; Remy will stop when you start talking.
+              </p>
+            )}
           </div>
         </div>
         <Remy size="sm" mood={shownMood} message={status} />

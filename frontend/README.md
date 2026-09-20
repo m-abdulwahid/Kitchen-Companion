@@ -16,6 +16,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Hands-free live cooking
+
+Phase 2 uses the relay in `../backend/`. In one terminal, run the backend from
+the repository root:
+
+```bash
+.venv/bin/uvicorn backend.app:app --reload --port 8001
+```
+
+In another, run this frontend. Copy `.env.local.example` to `.env.local` if
+the relay is not at `http://localhost:8001`. The browser file contains only
+the relay URL—never put API keys in it. Open a recipe, start cooking, then use
+**Enable hands-free Remy** once to grant microphone permission. After that,
+talk normally and speak over Remy to interrupt a reply.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

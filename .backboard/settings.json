@@ -1,0 +1,16 @@
+{
+	"permissions": {
+		"allow": [
+			"glob",
+			"execute(ls -R:*)",
+			"execute(cd /Users/norach/Documents/Projects/Kitchen-Companion:*)",
+			"read",
+			"fetch_url(https://docs.backboard.io/llms.txt)",
+			"fetch_url(https://backboard-docs.docsalot.dev/quickstart.md)",
+			"fetch_url(https://backboard-docs.docsalot.dev/concepts/memory.md)",
+			"fetch_url(https://backboard-docs.docsalot.dev/concepts/documents.md)",
+			"fetch_url(https://backboard-docs.docsalot.dev/concepts/voice.md)",
+			"fetch_url(https://backboard-docs.docsalot.dev/concepts/native-realtime-audio.md)"
+		]
+	}
+}
