@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { liveSocketUrl } from "@/lib/live-api";
+import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Speaker } from "@/lib/voice-api";
 
 export type LiveState = "idle" | "connecting" | "listening" | "speaking" | "error";
@@ -21,6 +22,8 @@ type RealtimeEvent = {
   text?: string;
   error?: { message?: string };
   message?: string;
+  action?: "remember" | "forget";
+  changed?: boolean;
 };
 
 const OUTPUT_SAMPLE_RATE = 24_000;
@@ -209,6 +212,16 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           callbacksRef.current.onError(eventMessage(event));
           changeState("error");
           return;
+        case "relay.memory":
+          callbacksRef.current.onReply(
+            event.action === "forget"
+              ? event.changed ? "Ella removed that kitchen memory." : "Ella could not find a matching kitchen memory."
+              : event.changed ? "Ella saved that kitchen preference." : "Ella could not save that kitchen preference.",
+          );
+          return;
+        case "relay.memory_error":
+          callbacksRef.current.onError(eventMessage(event));
+          return;
         case "input_audio_buffer.speech_started":
           // A new utterance must always beat an old reply.
           if (stateRef.current === "speaking") interrupt();
@@ -282,6 +295,7 @@ export function useLiveSession({ recipeTitle, currentStep, companion, onReply, o
           recipe_title: details.recipeTitle,
           current_step: details.currentStep,
           companion: details.companion,
+          memory_profile_id: cookingMemoryProfileId(),
         }));
       };
       socket.onmessage = (message) => {

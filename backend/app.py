@@ -17,14 +17,17 @@ import json
 import os
 import re
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, AsyncIterator, Protocol
 from urllib.parse import urlencode
 
 import websockets
+import httpx
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+
+from voice.backboard_memory import BackboardMemory, extract_memory_command, memory_context, valid_profile_id
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +59,7 @@ def load_dotenv() -> None:
 
 
 load_dotenv()
+LIVE_MEMORY = BackboardMemory()
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,7 @@ class CookingContext:
     companion_style: str = "Warm, precise, and encouraging."
     voice: str = DEFAULT_VOICE
     language: str = "en"
+    memory: str = ""
 
     @classmethod
     def from_message(cls, message: dict[str, Any]) -> "CookingContext":
@@ -119,7 +124,28 @@ class CookingContext:
             companion_style=self.companion_style,
             voice=self.voice,
             language=self.language,
+            memory=self.memory,
         )
+
+    def with_memory(self, memory: str) -> "CookingContext":
+        return CookingContext(
+            recipe_title=self.recipe_title,
+            current_step=self.current_step,
+            companion_name=self.companion_name,
+            companion_style=self.companion_style,
+            voice=self.voice,
+            language=self.language,
+            memory=clean_text(memory, 800),
+        )
+
+
+@dataclass
+class RelayState:
+    """Shared prompt state for both directions of one live WebSocket session."""
+
+    context: CookingContext
+    memory_profile_id: str = ""
+    saved_voice_commands: set[tuple[str, str]] = field(default_factory=set)
 
 
 def build_system_prompt(context: CookingContext) -> str:
@@ -131,7 +157,9 @@ def build_system_prompt(context: CookingContext) -> str:
         "Your reply will be spoken aloud. Answer in at most two short, plain sentences, under 30 words total. "
         "No markdown, lists, asterisks, or emoji. "
         f"Your personality: {context.companion_style} "
-        f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}."
+        f"Recipe: {context.recipe_title}. Current cooking step: {context.current_step}. "
+        "If the cook explicitly says ‘remember’ or ‘forget’ followed by a preference, briefly confirm it. "
+        f"{context.memory}"
         f"{language_instruction}"
     )
 
@@ -240,9 +268,8 @@ def client_control_to_upstream(message: dict[str, Any], context: CookingContext)
     raise ValueError(f"unsupported control message {message_type!r}")
 
 
-async def forward_client(client: WebSocket, upstream: UpstreamSocket, context: CookingContext) -> None:
+async def forward_client(client: WebSocket, upstream: UpstreamSocket, state: RelayState) -> None:
     """Map browser PCM/control messages to the small allowed upstream protocol."""
-    current_context = context
     while True:
         incoming = await client.receive()
         if incoming["type"] == "websocket.disconnect":
@@ -254,7 +281,7 @@ async def forward_client(client: WebSocket, upstream: UpstreamSocket, context: C
                 payload = json.loads(incoming["text"])
                 if not isinstance(payload, dict):
                     raise ValueError("control message must be a JSON object")
-                events, current_context = client_control_to_upstream(payload, current_context)
+                events, state.context = client_control_to_upstream(payload, state.context)
             except (ValueError, json.JSONDecodeError) as exc:
                 await client.send_json({"type": "relay.error", "code": "invalid_client_message", "message": str(exc)})
                 continue
@@ -264,19 +291,73 @@ async def forward_client(client: WebSocket, upstream: UpstreamSocket, context: C
             await upstream.send(json.dumps(event, ensure_ascii=False))
 
 
-async def forward_upstream(client: WebSocket, upstream: UpstreamSocket) -> None:
-    """Forward provider events unchanged; the browser receives no provider credential."""
+async def with_live_memory(context: CookingContext, profile_id: str) -> CookingContext:
+    """Recall a few explicit preferences without making Backboard availability a live-voice dependency."""
+    if not profile_id or not LIVE_MEMORY.enabled:
+        return context
+    query = f"{context.recipe_title} {context.current_step} allergies dietary preferences substitutions"
+    try:
+        remembered = await LIVE_MEMORY.recall(profile_id, query)
+    except (httpx.HTTPError, RuntimeError, ValueError):
+        return context
+    return context.with_memory(memory_context(remembered))
+
+
+async def persist_voice_memory(
+    client: WebSocket, upstream: UpstreamSocket, state: RelayState, transcript: str,
+) -> None:
+    """Persist only an explicit spoken command and refresh the live prompt afterwards."""
+    command = extract_memory_command(transcript)
+    if not command or not state.memory_profile_id:
+        return
+    command_key = (command.action, command.fact.casefold())
+    if command_key in state.saved_voice_commands:
+        return
+    state.saved_voice_commands.add(command_key)
+    if not LIVE_MEMORY.enabled:
+        await client.send_json({"type": "relay.memory_error", "message": "Kitchen memory is not configured."})
+        return
+    try:
+        if command.action == "remember":
+            changed = await LIVE_MEMORY.remember(state.memory_profile_id, command.fact)
+        else:
+            changed = await LIVE_MEMORY.forget(state.memory_profile_id, command.fact)
+        state.context = await with_live_memory(state.context, state.memory_profile_id)
+        await upstream.send(json.dumps(session_update(state.context), ensure_ascii=False))
+        await client.send_json({"type": "relay.memory", "action": command.action, "changed": changed})
+    except (httpx.HTTPError, RuntimeError, ValueError):
+        await client.send_json({"type": "relay.memory_error", "message": "Kitchen memory could not be updated."})
+
+
+async def forward_upstream(client: WebSocket, upstream: UpstreamSocket, state: RelayState) -> None:
+    """Forward provider events unchanged and save explicit voice-memory commands."""
+    transcript = ""
     while True:
         raw = await upstream.recv()
         if isinstance(raw, bytes):
             await client.send_bytes(raw)
         else:
+            try:
+                event = parse_upstream(raw)
+                event_type = event.get("type")
+                if event_type == "input_audio_buffer.speech_started":
+                    transcript = ""
+                elif event_type == "conversation.item.input_audio_transcription.delta":
+                    transcript = clean_text(transcript + str(event.get("delta") or ""), 300)
+                elif event_type == "conversation.item.input_audio_transcription.completed":
+                    transcript = clean_text(event.get("transcript") or transcript, 300)
+                    await persist_voice_memory(client, upstream, state, transcript)
+                elif event_type in {"input_audio_buffer.committed", "response.done"}:
+                    await persist_voice_memory(client, upstream, state, transcript)
+            except (json.JSONDecodeError, RuntimeError):
+                # The browser still receives the raw provider event; unreadable telemetry must not end cooking.
+                pass
             await client.send_text(raw)
 
 
-async def relay(client: WebSocket, upstream: UpstreamSocket, context: CookingContext) -> None:
-    client_task = asyncio.create_task(forward_client(client, upstream, context))
-    upstream_task = asyncio.create_task(forward_upstream(client, upstream))
+async def relay(client: WebSocket, upstream: UpstreamSocket, state: RelayState) -> None:
+    client_task = asyncio.create_task(forward_client(client, upstream, state))
+    upstream_task = asyncio.create_task(forward_upstream(client, upstream, state))
     done, pending = await asyncio.wait({client_task, upstream_task}, return_when=asyncio.FIRST_COMPLETED)
     for task in pending:
         task.cancel()
@@ -317,13 +398,18 @@ async def live_session(client: WebSocket, session_id: str) -> None:
         if not isinstance(initial, dict) or initial.get("type") != "session.configure":
             raise ValueError("first message must be a session.configure JSON object")
         context = CookingContext.from_message(initial)
+        memory_profile_id = valid_profile_id(initial.get("memory_profile_id"))
+        state = RelayState(
+            context=await with_live_memory(context, memory_profile_id),
+            memory_profile_id=memory_profile_id,
+        )
         settings = settings_from_env()
         async with open_upstream(settings) as upstream:
-            handshake_events = await configure_upstream(upstream, context)
+            handshake_events = await configure_upstream(upstream, state.context)
             for event in handshake_events:
                 await client.send_json(event)
             await client.send_json({"type": "relay.ready", "session_id": safe_session_id})
-            await relay(client, upstream, context)
+            await relay(client, upstream, state)
     except WebSocketDisconnect:
         return
     except (ValueError, RuntimeError, asyncio.TimeoutError, websockets.WebSocketException) as exc:

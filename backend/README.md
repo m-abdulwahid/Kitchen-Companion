@@ -30,6 +30,7 @@ first JSON message:
   "type": "session.configure",
   "recipe_title": "Cozy Shakshuka",
   "current_step": "Soften onion and pepper.",
+  "memory_profile_id": "an-anonymous-browser-local-id",
   "companion": {
     "name": "Remy",
     "style": "Warm, precise, and encouraging.",
@@ -45,6 +46,12 @@ recipe context, `{"type":"interrupt"}` to cancel a spoken reply, or
 `{"type":"proactive","text":"..."}` to speak a camera-coach update.
 Provider events, including `response.audio.delta`, are relayed to the browser unchanged.
 
+When `BACKBOARD_API_KEY` is configured, the optional `memory_profile_id` is
+used only to retrieve that browser's explicit cooking preferences before the
+Realtime session starts. A spoken phrase beginning with `remember` or `forget`
+is saved or removed, then the live prompt is refreshed. The relay sends a
+`relay.memory` event to confirm the outcome; it never persists casual speech.
+
 ## Config
 
 The shared root `.env` needs `OMNI_KEY`. Optional variables:
@@ -53,3 +60,4 @@ The shared root `.env` needs `OMNI_KEY`. Optional variables:
 | --- | --- |
 | `OMNI_REALTIME_MODEL` | `qwen3.5-omni-plus-realtime` |
 | `OMNI_REALTIME_ENDPOINT` | `wss://yibuapi.com/v1/realtime` |
+| `BACKBOARD_API_KEY` | none; enables opt-in browser-local cooking memory |

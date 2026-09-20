@@ -13,6 +13,8 @@ class MemoryCommandTests(unittest.TestCase):
                          memory.MemoryCommand("remember", "I am allergic to peanuts"))
         self.assertEqual(memory.extract_memory_command("Please forget that I hate cilantro."),
                          memory.MemoryCommand("forget", "I hate cilantro"))
+        self.assertEqual(memory.extract_memory_command("Ella, remember that I am allergic to peanuts."),
+                         memory.MemoryCommand("remember", "I am allergic to peanuts"))
         self.assertIsNone(memory.extract_memory_command("I am allergic to peanuts"))
         self.assertIsNone(memory.extract_memory_command("remember"))
 

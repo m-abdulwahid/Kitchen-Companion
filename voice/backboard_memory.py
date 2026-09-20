@@ -42,7 +42,10 @@ def valid_profile_id(value: object) -> str:
 def extract_memory_command(text: object) -> MemoryCommand | None:
     """Persist only an explicit request, never an inferred sensitive fact."""
     spoken = clean_text(text, MAX_FACT_CHARS + 40)
-    match = re.match(r"(?i)^(?:please )?(remember|forget)(?: that)?\s+(.+?)[.!?]*$", spoken)
+    match = re.match(
+        r"(?i)^(?:(?:ella|whisk[- ]ella|remy)[,:]?\s+)?(?:please\s+)?(remember|forget)(?: that)?\s+(.+?)[.!?]*$",
+        spoken,
+    )
     if not match:
         return None
     fact = clean_text(match.group(2), MAX_FACT_CHARS)

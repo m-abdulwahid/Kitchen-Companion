@@ -1,7 +1,7 @@
 # Backboard cooking memory
 
 Phase 4 gives each browser installation an isolated, durable Backboard memory.
-It remembers only a fact the cook deliberately saves in **Remy's kitchen
+It remembers only a fact the cook deliberately saves in **Ella's kitchen
 memory**. Examples: `no peanuts`, `likes extra spice`, or `only has oat milk`.
 
 ## Setup
@@ -24,6 +24,12 @@ cannot be retrieved for another cook.
 
 - Clicking **Remember** sends the typed fact to `POST /api/memory`; this makes
   a Backboard memory write and does not call Omni.
+- In hands-free mode, the cook can say **“Ella, remember that I am allergic to
+  peanuts”** or **“Forget that I avoid peanuts.”** Only an utterance beginning
+  with `remember` or `forget` is saved; casual conversation is never stored.
+- A new hands-free session retrieves up to three relevant preferences before
+  its Omni Realtime connection is configured. This lets Ella answer a new
+  recipe question such as “Do you know if I have any allergies?”
 - Camera-agent turns semantically retrieve up to three relevant saved facts and
   add a short labelled recap to the Omni cooking prompt.
 - Retrieval is cached for three minutes per recipe/step query, so Phase 3's
@@ -36,6 +42,6 @@ but the cooking, camera, and live voice flows continue normally.
 ## Privacy boundary
 
 Memory is opt-in: the app does not infer or save allergies, dietary choices, or
-other personal facts from a camera image or casual conversation. The current
-Realtime speech path is intentionally not used to write memories because it
-does not yet expose a reliable explicit-consent command to the HTTP agent.
+other personal facts from a camera image or casual conversation. Voice writes
+require the unambiguous `remember` or `forget` command and stay isolated to the
+same anonymous browser profile.
