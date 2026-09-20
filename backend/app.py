@@ -451,7 +451,12 @@ async def live_session(client: WebSocket, session_id: str) -> None:
     except (ValueError, RuntimeError, asyncio.TimeoutError, websockets.WebSocketException) as exc:
         await client.send_json({"type": "relay.error", "message": str(exc)})
     finally:
-        await client.close()
+        # A browser disconnect or an upstream failure may already have closed
+        # the ASGI socket. Closing it again raises and obscures the real error.
+        try:
+            await client.close()
+        except RuntimeError:
+            pass
 
 
 @app.get("/")

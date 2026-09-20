@@ -9,7 +9,9 @@ const THUMBNAIL_HEIGHT = 24;
 
 /** Capture one modest JPEG plus a tiny local thumbnail for change detection. */
 export function captureCameraFrame(video: HTMLVideoElement): CameraFrame | null {
-  if (!video.videoWidth || !video.videoHeight) return null;
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
+    return null;
+  }
   const width = Math.min(FRAME_WIDTH, video.videoWidth);
   const height = Math.round((width * video.videoHeight) / video.videoWidth);
   const canvas = document.createElement("canvas");
@@ -31,4 +33,15 @@ export function captureCameraFrame(video: HTMLVideoElement): CameraFrame | null 
     thumbnail[index] = (pixels[index * 4] + pixels[index * 4 + 1] + pixels[index * 4 + 2]) / 3;
   }
   return { image: canvas.toDataURL("image/jpeg", 0.6), thumbnail };
+}
+
+/** A camera still is nearly black only while a device is starting, blocked, or covered. */
+export function hasVisibleCameraImage(frame: CameraFrame): boolean {
+  let total = 0;
+  let lightest = 0;
+  for (const pixel of frame.thumbnail) {
+    total += pixel;
+    lightest = Math.max(lightest, pixel);
+  }
+  return total / frame.thumbnail.length >= 8 || lightest >= 20;
 }

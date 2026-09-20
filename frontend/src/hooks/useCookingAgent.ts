@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
-import { captureCameraFrame, type CameraFrame } from "@/lib/camera-frame";
+import { captureCameraFrame, hasVisibleCameraImage, type CameraFrame } from "@/lib/camera-frame";
 import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 import type { Speaker } from "@/lib/voice-api";
@@ -68,7 +68,7 @@ export function useCookingAgent(options: Options) {
     const video = current.videoRef.current;
     if (!video) return;
     const frame = captureCameraFrame(video);
-    if (!frame) return;
+    if (!frame || !hasVisibleCameraImage(frame)) return;
     if (!force && (
       lastThumbnailRef.current &&
       imageDifference(frame.thumbnail, lastThumbnailRef.current) < CHANGE_THRESHOLD

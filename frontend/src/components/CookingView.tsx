@@ -8,7 +8,7 @@ import { useLanguage } from "@/hooks/useLanguage";
 import { useLiveSession } from "@/hooks/useLiveSession";
 import { describeCameraError, requestCamera } from "@/lib/camera-error";
 import { checkCookingFrame, type CookingAgentDecision } from "@/lib/cooking-agent-api";
-import { captureCameraFrame, type CameraFrame } from "@/lib/camera-frame";
+import { captureCameraFrame, hasVisibleCameraImage, type CameraFrame } from "@/lib/camera-frame";
 import { cookingMemoryProfileId } from "@/lib/cooking-profile";
 import type { Recipe } from "@/lib/types";
 
@@ -26,6 +26,16 @@ function newCookingSessionId(): string {
 
 function openingGreeting(observation: string): string {
   return `I can see ${observation}. Let me know if you want help with what to do next.`;
+}
+
+async function waitForVisibleCameraFrame(video: HTMLVideoElement): Promise<CameraFrame | null> {
+  const deadline = performance.now() + 3_000;
+  while (performance.now() < deadline) {
+    const frame = captureCameraFrame(video);
+    if (frame && hasVisibleCameraImage(frame)) return frame;
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 150));
+  }
+  return null;
 }
 
 export function CookingView({ recipe, onExit }: CookingViewProps) {
@@ -145,9 +155,11 @@ export function CookingView({ recipe, onExit }: CookingViewProps) {
 
   async function enableHandsFree() {
     const video = videoRef.current;
-    const frame = video ? captureCameraFrame(video) : null;
+    const frame = video ? await waitForVisibleCameraFrame(video) : null;
     if (!frame) {
-      setStatus("Camera is still warming up. Point it at the food, then try hands-free again.");
+      setCameraProblem("The camera feed is black or still starting. Uncover it, add light, or close another app using the camera, then press Try again.");
+      setStatus("Ella is waiting for a usable camera frame.");
+      setEllaMood("idle");
       return;
     }
     setStartingHandsFree(true);
