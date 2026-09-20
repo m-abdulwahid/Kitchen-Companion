@@ -27,10 +27,17 @@ SENTRY_DSN=https://public@example.ingest.sentry.io/123
 ```env
 # frontend/.env.local (browser)
 NEXT_PUBLIC_SENTRY_DSN=https://public@example.ingest.sentry.io/123
+
+# Optional production source-map upload (build time only; never NEXT_PUBLIC_)
+SENTRY_ORG=your-org-slug
+SENTRY_PROJECT=your-project-slug
+SENTRY_AUTH_TOKEN=sntrys_your_build_token
 ```
 
 Restart the frontend and voice service after adding them. A DSN is safe to put
-in the browser; do not put a Sentry auth token there.
+in the browser; do not put a Sentry auth token in a `NEXT_PUBLIC_` variable.
+The Next.js config creates a `/monitoring` tunnel and uploads readable production
+source maps when the three build-time values are supplied.
 
 ## Demo evidence for the Sentry challenge
 
@@ -41,6 +48,10 @@ in the browser; do not put a Sentry auth token there.
 4. Trigger a safe failure, such as stopping the voice service and clicking
    **Remember**, then inspect the captured error/session replay. Restore the
    service and demonstrate the recovery message.
+
+For a first SDK verification, also trigger a temporary, identifiable error from
+the running application and confirm it in Sentry before removing that trigger.
+This cannot be completed until the project DSN is configured.
 
 This gives the submission two products beyond error monitoring—Performance and
 Session Replay—plus backend profiling. The implementation deliberately avoids

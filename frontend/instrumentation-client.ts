@@ -1,12 +1,14 @@
 import * as Sentry from "@sentry/nextjs";
 
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+const traceSampleRate = process.env.NODE_ENV === "development" ? 1 : 0.1;
 
 Sentry.init({
   dsn,
   enabled: Boolean(dsn),
   sendDefaultPii: false,
-  tracesSampleRate: 1,
+  tracesSampleRate: traceSampleRate,
+  tracePropagationTargets: ["localhost:8000", "localhost:8001", /^\/(?!\/)/],
   integrations: [
     Sentry.browserTracingIntegration(),
     // The cooking view contains camera and preference data. Keep replay useful
